@@ -6,7 +6,8 @@
   "client": [
     "FormDisplayNameMixin",
     "UIFilmPanelMixin",
-    "UIKeyframeFactoryMixin"
+    "UIKeyframeFactoryMixin",
+    "UIAnchorKeyframeFactoryMixin"
   ],
   "injectors": {
     "defaultRequire": 1

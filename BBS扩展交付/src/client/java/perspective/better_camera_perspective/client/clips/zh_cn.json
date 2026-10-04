@@ -2,5 +2,7 @@
   "bbs.ui.camera.clips.bbs:multi_tracker": "多样追踪",
   "bbs.ui.camera.panels.axis_anchor": "锚点",
   "bbs.ui.camera.panels.xyz.relative": "相对值",
-  "bbs.ui.camera.panels.xyz.absolute": "绝对值"
+  "bbs.ui.camera.panels.xyz.absolute": "绝对值",
+  "bbs.ui.camera.panels.anchor_uncategorized": "未分类",
+  "bbs.ui.camera.panels.back": "返回"
 }

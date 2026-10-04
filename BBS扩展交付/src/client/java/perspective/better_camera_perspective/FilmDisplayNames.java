@@ -43,13 +43,19 @@ public final class FilmDisplayNames {
      * 若 form 是某个已打开影片中演员的表单，返回该演员的显示名：
      * 优先 replay.label（自定义名），其次 form.name（表单名）；
      * 都没有则返回 null（由调用方回退到原逻辑，即显示 form 类型）。
+     *
+     * v1.0.1：移除「formId（类型）相等」的宽匹配 —— 资产库里的伪装与影片演员
+     * 使用同一伪装模板时类型 Link 相同，宽匹配会把资产伪装的显示名集体覆盖成
+     * 影片中第一个同名演员的名字（伪装选择界面名称集体错乱）。
+     * 现在只按「引用相等」反查：只有表单实例确实挂在影片某个演员（replay.form.get()）
+     * 上时才反查，资产库伪装不会被误伤；影片重载后显示层拿到的仍是同一
+     * replay.form.get() 实例，引用相等依然成立。
      */
     public static String lookupActorName(Form form) {
         if (form == null) {
             return null;
         }
 
-        String formId = form.getFormId();
         Iterator<WeakReference<UIFilmPanel>> it = PANELS.iterator();
         while (it.hasNext()) {
             UIFilmPanel panel = it.next().get();
@@ -69,8 +75,8 @@ public final class FilmDisplayNames {
                     continue;
                 }
 
-                // 引用相等（同实例），或类型相等（跨加载实例兜底）
-                if (other == form || other.getFormId().equals(formId)) {
+                // 仅引用相等（表单实例确实属于该演员）才反查
+                if (other == form) {
                     String label = replay.label.get();
                     if (!label.isEmpty()) {
                         return label;
