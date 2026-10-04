@@ -1,0 +1,415 @@
+package perspective.better_camera_perspective.client.ui;
+
+import mchorse.bbs_mod.camera.clips.misc.TrackerFrame;
+import mchorse.bbs_mod.camera.data.Angle;
+import mchorse.bbs_mod.camera.data.Point;
+import mchorse.bbs_mod.camera.data.Position;
+import mchorse.bbs_mod.forms.entities.IEntity;
+import mchorse.bbs_mod.l10n.L10n;
+import mchorse.bbs_mod.l10n.keys.IKey;
+import mchorse.bbs_mod.settings.values.base.BaseValueBasic;
+import mchorse.bbs_mod.settings.values.core.ValueString;
+import mchorse.bbs_mod.ui.Keys;
+import mchorse.bbs_mod.ui.UIKeys;
+import mchorse.bbs_mod.ui.film.IUIClipsDelegate;
+import mchorse.bbs_mod.ui.film.UIClipsPanel;
+import mchorse.bbs_mod.ui.film.UIFilmPanel;
+import mchorse.bbs_mod.ui.film.clips.UIClip;
+import mchorse.bbs_mod.ui.film.clips.modules.UIPointModule;
+import mchorse.bbs_mod.ui.film.clips.widgets.UIBitToggle;
+import mchorse.bbs_mod.ui.film.replays.UIReplaysEditor;
+import mchorse.bbs_mod.ui.film.utils.keyframes.UIFilmKeyframes;
+import mchorse.bbs_mod.ui.framework.UIContext;
+import mchorse.bbs_mod.ui.framework.elements.UIElement;
+import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
+import mchorse.bbs_mod.ui.framework.elements.buttons.UICirculate;
+import mchorse.bbs_mod.ui.framework.elements.buttons.UIToggle;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIAnchorKeyframeFactory;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIKeyframeFactory;
+import mchorse.bbs_mod.utils.MathUtils;
+import mchorse.bbs_mod.utils.clips.Clips;
+import mchorse.bbs_mod.utils.joml.Matrices;
+import mchorse.bbs_mod.utils.keyframes.Keyframe;
+import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
+import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import org.joml.Vector3d;
+import org.joml.Vector3f;
+import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
+
+/**
+ * 多样追踪（MultiTracker）——剪辑 UI 面板。
+ *
+ * 组合了两套控件：
+ *  - 「关键帧」剪辑：编辑按钮 + 关键帧编辑器 + additive 开关；
+ *  - 「追踪器」剪辑：目标选取、附件选取、偏移、角度、看向目标、相对、启用位掩码。
+ *
+ * 拖动相机时：先按追踪器方式反解 offset/angle（保持跟随），再按关键帧方式写入曲线。
+ */
+@Environment(EnvType.CLIENT)
+public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
+    // —— 关键帧侧 ——
+    public UIButton edit;
+    public UIKeyframeEditor keyframes;
+    public UIToggle additive;
+
+    // —— 追踪侧 ——
+    public UIButton selector;
+    public UIButton group;
+    public UIPointModule point;
+    public UIPointModule angle;
+    public UIToggle lookAt;
+    public UIToggle relative;
+    public UIBitToggle active;
+    public UICirculate xMode;
+    public UICirculate yMode;
+    public UICirculate zMode;
+
+    public UIMultiTrackerClip(MultiTrackerClientClip clip, IUIClipsDelegate editor) {
+        super(clip, editor);
+    }
+
+    @Override
+    protected void addEnvelopes() {
+        super.addEnvelopes();
+        this.additive = this.toggle(UIKeys.CAMERA_PANELS_ADDITIVE, this.clip.additive);
+        this.panels.add(this.additive);
+    }
+
+    @Override
+    protected void registerUI() {
+        super.registerUI();
+
+        // —— 关键帧编辑器 ——
+        this.keyframes = new UIKeyframeEditor(consumer -> new UIFilmKeyframes(this.editor, consumer));
+        this.keyframes
+            .view
+            .rulerRenderer(
+                context -> UIReplaysEditor.renderRuler(context, this.keyframes.view, (UIClipsPanel) this.editor, (Clips) this.clip.getParent(), this.clip.tick.get())
+            );
+        this.keyframes.view.duration(() -> this.clip.duration.get());
+        this.keyframes.setUndoId("multi_tracker_keyframes");
+        this.edit = new UIButton(UIKeys.GENERAL_EDIT, b -> {
+            this.editor.embedView(this.keyframes);
+            this.keyframes.view.resetView();
+            this.keyframes.view.getGraph().clearSelection();
+        });
+        this.edit.keys().register(Keys.FORMS_EDIT, () -> this.edit.clickItself());
+
+        // —— 追踪目标 ——
+        this.selector = new UIButton(
+            UIKeys.CAMERA_PANELS_TARGET_TITLE,
+            b -> {
+                UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+                if (panel != null) {
+                    UIAnchorKeyframeFactory.displayActors(
+                        this.getContext(), panel.getController().getEntities(), this.clip.selector.get(), i -> this.clip.selector.set(i)
+                    );
+                }
+            }
+        );
+        this.selector.tooltip(UIKeys.CAMERA_PANELS_TARGET_TOOLTIP);
+        this.group = new UIButton(
+            UIKeys.GENERIC_KEYFRAMES_ANCHOR_PICK_ATTACHMENT,
+            b -> UIAnchorKeyframeFactory.displayAttachments(
+                this.getParent(UIFilmPanel.class), this.clip.selector.get(), this.clip.group.get(), attachment -> this.clip.group.set(attachment)
+            )
+        );
+        this.point = (UIPointModule) this.bind(new UIPointModule(this.editor, UIKeys.CAMERA_PANELS_OFFSET).contextMenu(), () -> this.point.fill(this.clip.offset));
+        this.angle = (UIPointModule) this.bind(new UIPointModule(this.editor, UIKeys.CAMERA_PANELS_ANGLE).contextMenu(), () -> this.angle.fill(this.clip.angle));
+        this.lookAt = this.toggle(UIKeys.CAMERA_PANELS_LOOK_AT, this.clip.lookAt);
+        this.relative = this.toggle(UIKeys.CAMERA_PANELS_RELATIVE, this.clip.relative);
+        this.active = (UIBitToggle) this.bind(new UIBitToggle(value -> this.clip.active.set(value)).all(), () -> this.active.setValue(this.clip.active.get()));
+
+        // —— 三向轴模式（v0.3.1）：注册关键帧编辑器里「三向轴模式」轴的用户选择式值 UI ——
+        UIKeyframeFactory.registerProperty("axis_mode_axis", UIAxisModeKeyframeFactory::new);
+
+        // —— 每轴轴模式开关（v0.3.1）：仅当三向轴模式为「自定义」时生效 ——
+        this.xMode = this.axisSwitch(0, this.clip.xMode, "bbs.ui.camera.panels.axis_mode_x");
+        this.yMode = this.axisSwitch(1, this.clip.yMode, "bbs.ui.camera.panels.axis_mode_y");
+        this.zMode = this.axisSwitch(2, this.clip.zMode, "bbs.ui.camera.panels.axis_mode_z");
+    }
+
+    /** 每轴「轴模式」循环开关（相对值 / 绝对值），切换时对该轴 XYZ 关键帧逐帧换算（画面不跳变）。 */
+    private UICirculate axisSwitch(int axis, ValueString modeValue, String labelKey) {
+        UICirculate circul = new UICirculate(c -> {
+            String newMode = c.getValue() == 0 ? "relative" : "absolute";
+            if (!newMode.equals(modeValue.get())) {
+                this.convertAxis(axis, newMode);
+                modeValue.set(newMode);
+            }
+        });
+        circul.addLabel(L10n.lang("bbs.ui.camera.panels.axis_mode.relative"));
+        circul.addLabel(L10n.lang("bbs.ui.camera.panels.axis_mode.absolute"));
+        circul.tooltip(L10n.lang(labelKey));
+        return circul;
+    }
+
+    @Override
+    protected void registerPanels() {
+        super.registerPanels();
+        this.panels.add(this.section(UIKeys.CAMERA_PANELS_KEYFRAMES, new UIElement[]{this.edit}));
+        this.panels.add(this.section(UIKeys.CAMERA_PANELS_TARGET, new UIElement[]{this.selector, this.group}));
+        this.panels.add(this.point);
+        this.panels.add(this.angle);
+        this.panels.add(this.lookAt);
+        this.panels.add(this.relative);
+        this.panels.add(this.active);
+        this.panels.add(this.section(L10n.lang("bbs.ui.camera.panels.axis_mode"), new UIElement[]{this.xMode, this.yMode, this.zMode}));
+    }
+
+    @Override
+    public void editClip(Position position) {
+        // 1) 追踪求解：把当前相机位置反解为 offset/angle/fov（保持跟随语义）
+        this.solveTracker(position);
+        // 2) 关键帧写入：把当前相机位置写入关键帧通道
+        this.insertKeyframes(position);
+        super.editClip(position);
+    }
+
+    // ================= 追踪求解（复制自 UITrackerClip.editClip） =================
+
+    private void solveTracker(Position position) {
+        TrackerFrame frame = this.resolveFrame(position);
+        if (frame != null) {
+            Point offset = this.clip.offset.get();
+            Point angle = this.clip.angle.get();
+            boolean lookAt = this.clip.lookAt.get();
+            if (!lookAt && this.isActive(0, 1, 2)) {
+                Vector3d current = frame.position(offset);
+                Point solved = frame.solveOffset(
+                    this.pick(0, position.point.x, current.x), this.pick(1, position.point.y, current.y), this.pick(2, position.point.z, current.z)
+                );
+                if (solved != null) {
+                    this.clip.offset.set(solved);
+                }
+            }
+
+            if (this.isActive(3, 4, 5)) {
+                Angle current = lookAt ? frame.lookAtAngles(offset, angle) : frame.angles(angle);
+                float yaw = this.pick(3, position.angle.yaw, current.yaw);
+                float pitch = this.pick(4, position.angle.pitch, current.pitch);
+                float roll = this.pick(5, position.angle.roll, current.roll);
+                this.clip.angle.set(lookAt ? frame.solveLookAtAngles(offset, yaw, pitch, roll) : frame.solveAngles(yaw, pitch, roll));
+            }
+        }
+    }
+
+    private TrackerFrame resolveFrame(Position position) {
+        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+        UIContext context = this.getContext();
+        String selector = this.clip.selector.get();
+        if (panel != null && context != null && !selector.isEmpty()) {
+            TrackerFrame frame = TrackerFrame.resolve(
+                panel.getController().getEntities(), panel.getController().getEntities().get(selector),
+                this.clip.group.get(), position.point.x, position.point.y, position.point.z, context.getTransition()
+            );
+            if (frame != null && this.clip.relative.get()) {
+                if (this.clip.getUnderneath() == null) {
+                    return null;
+                }
+
+                frame.relative(this.clip.getUnderneath(), this.clip.position);
+            }
+
+            return frame;
+        } else {
+            return null;
+        }
+    }
+
+    private boolean isActive(int... bits) {
+        for (int bit : bits) {
+            if (this.clip.isActive(bit)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private float pick(int bit, float camera, float current) {
+        return this.clip.isActive(bit) ? camera : current;
+    }
+
+    private double pick(int bit, double camera, double current) {
+        return this.clip.isActive(bit) ? camera : current;
+    }
+
+    // ================= 关键帧写入（复制自 UIKeyframeClip.editClip） =================
+
+    private void insertKeyframes(Position position) {
+        Position newPos = position.copy();
+        UIContext context = this.getContext();
+        float tick = this.editor.getKeyframeCursor(context == null ? 0.0F : context.getTransition()) - (float) this.clip.tick.get().intValue();
+        if (this.clip.additive.get()) {
+            Position underneath = this.clip.getUnderneath();
+            float factor = this.clip.envelope.factorEnabled(this.clip.duration.get(), tick);
+            if (underneath != null && !(tick <= 0.0F) && factor != 0.0F && this.clip.enabled.get()) {
+                this.insertAdditiveKeyframe(tick, this.clip.x, (newPos.point.x - underneath.point.x) / (double) factor);
+                this.insertAdditiveKeyframe(tick, this.clip.y, (newPos.point.y - underneath.point.y) / (double) factor);
+                this.insertAdditiveKeyframe(tick, this.clip.z, (newPos.point.z - underneath.point.z) / (double) factor);
+                this.insertAdditiveKeyframe(tick, this.clip.yaw, (double) ((newPos.angle.yaw - underneath.angle.yaw) / factor));
+                this.insertAdditiveKeyframe(tick, this.clip.pitch, (double) ((newPos.angle.pitch - underneath.angle.pitch) / factor));
+                this.insertAdditiveKeyframe(tick, this.clip.roll, (double) ((newPos.angle.roll - underneath.angle.roll) / factor));
+                this.insertAdditiveKeyframe(tick, this.clip.fov, (double) ((newPos.angle.fov - underneath.angle.fov) / factor));
+            }
+        } else {
+            if (!this.clip.distance.isEmpty()) {
+                double distance = this.clip.distance.interpolate(tick);
+                if (distance != 0.0) {
+                    Vector3f rotation = Matrices.rotation(MathUtils.toRad(newPos.angle.pitch), MathUtils.toRad(-newPos.angle.yaw - 180.0F));
+                    newPos.point.x = newPos.point.x - (double) rotation.x * distance;
+                    newPos.point.y = newPos.point.y - (double) rotation.y * distance;
+                    newPos.point.z = newPos.point.z - (double) rotation.z * distance;
+                }
+            }
+
+            // 多样追踪（v0.3.1）：逐轴按取值模式写入——相对轴存「相对锚点偏移」、绝对轴存相机绝对坐标。
+            double ax = 0.0D, ay = 0.0D, az = 0.0D;
+            boolean rel0 = "relative".equals(this.clip.axisMode(0));
+            boolean rel1 = "relative".equals(this.clip.axisMode(1));
+            boolean rel2 = "relative".equals(this.clip.axisMode(2));
+            if ((rel0 || rel1 || rel2) && !this.clip.lookAt.get() && this.isActive(0, 1, 2)) {
+                TrackerFrame anchorFrame = this.resolveFrame(position);
+                if (anchorFrame != null) {
+                    Vector3d anchor = anchorFrame.position(this.clip.offset.get());
+                    ax = rel0 && this.clip.isActive(0) ? anchor.x : 0.0D;
+                    ay = rel1 && this.clip.isActive(1) ? anchor.y : 0.0D;
+                    az = rel2 && this.clip.isActive(2) ? anchor.z : 0.0D;
+                }
+            }
+            this.insertKeyframe(tick, this.clip.x, newPos.point.x - ax);
+            this.insertKeyframe(tick, this.clip.y, newPos.point.y - ay);
+            this.insertKeyframe(tick, this.clip.z, newPos.point.z - az);
+            this.insertKeyframe(tick, this.clip.yaw, (double) newPos.angle.yaw);
+            this.insertKeyframe(tick, this.clip.pitch, (double) newPos.angle.pitch);
+            this.insertKeyframe(tick, this.clip.roll, (double) newPos.angle.roll);
+            this.insertKeyframe(tick, this.clip.fov, (double) newPos.angle.fov);
+        }
+    }
+
+    private void insertAdditiveKeyframe(float tick, KeyframeChannel<Double> channel, double offset) {
+        double reference = channel.isEmpty() ? 0.0 : channel.interpolate(0.0F);
+        if (channel.getKeyframes().stream().noneMatch(keyframe -> keyframe.getTick() == 0.0F)) {
+            this.insertKeyframe(0.0F, channel, reference);
+        }
+
+        this.insertKeyframe(tick, channel, reference - offset);
+    }
+
+    private void insertKeyframe(float tick, KeyframeChannel<Double> channel, double x) {
+        KeyframeSegment<Double> segment = channel.findSegment(tick);
+        int insert = channel.insert(tick, x);
+        if (segment != null) {
+            channel.get(insert).copyOverExtra(segment.a);
+        }
+    }
+
+    @Override
+    public void fillData() {
+        super.fillData();
+        this.updateDuration(this.clip.duration.get());
+        this.keyframes.setClip(this.clip);
+        // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
+        this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
+        // v0.3.1：补挂「三向轴模式」轴（property 传任意非 null BaseValueBasic，按属性名命中自定义 UI 工厂）
+        this.appendSheet("axis_mode_axis", L10n.lang("bbs.ui.camera.panels.axis_axis_mode"), 0xFF26A69A, this.clip.axisModeAxis, this.clip.xMode);
+        // 每轴开关状态：跟随三向轴（非 custom 时锁定为三向轴模式；custom 时按各自开关并解锁）
+        String mode = this.clip.resolveAxisMode();
+        boolean custom = "custom".equals(mode);
+        this.syncAxisSwitch(this.xMode, this.clip.xMode, custom);
+        this.syncAxisSwitch(this.yMode, this.clip.yMode, custom);
+        this.syncAxisSwitch(this.zMode, this.clip.zMode, custom);
+    }
+
+    private void appendSheet(String id, IKey title, int color, KeyframeChannel<?> channel) {
+        this.appendSheet(id, title, color, channel, null);
+    }
+
+    private void appendSheet(String id, IKey title, int color, KeyframeChannel<?> channel, BaseValueBasic property) {
+        boolean exists = this.keyframes.view.getGraph().getSheets().stream().anyMatch(sheet -> sheet.channel == channel);
+        if (!exists) {
+            this.keyframes.view.addSheet(new UIKeyframeSheet(id, title, color, channel, property));
+        }
+    }
+
+    private void syncAxisSwitch(UICirculate circul, ValueString modeValue, boolean custom) {
+        circul.setValue("relative".equals(modeValue.get()) ? 0 : 1);
+        circul.setEnabled(custom);
+    }
+
+    // ================= 轴取值模式切换（v0.3.1） =================
+
+    /** 实例包装：每轴开关切换时转换该轴关键帧（画面不跳变）。 */
+    private void convertAxis(int axis, String newMode) {
+        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+        if (panel == null) {
+            return;
+        }
+        convertAxisStatic(this.clip, panel, axis, "relative".equals(newMode));
+    }
+
+    /**
+     * 三向轴模式选择（UIAxisModeKeyframeFactory 调用）。
+     * 相对 ↔ 绝对：每个关键帧值 ± 该时刻锚点位置，转换后摄像机视角状态不变。
+     * 自定义：不批量转换，解锁每轴开关由用户逐轴调节。
+     */
+    public static void convertAll(MultiTrackerClientClip clip, UIFilmPanel panel, String newMode) {
+        if ("custom".equals(newMode)) {
+            return;
+        }
+        boolean toRelative = "relative".equals(newMode);
+        convertAxisStatic(clip, panel, 0, toRelative);
+        convertAxisStatic(clip, panel, 1, toRelative);
+        convertAxisStatic(clip, panel, 2, toRelative);
+    }
+
+    public static void convertAxisStatic(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, boolean toRelative) {
+        String selector = clip.selector.get();
+        if (selector.isEmpty()) {
+            return;
+        }
+
+        IEntity actor = panel.getController().getEntities().get(selector);
+        if (actor == null) {
+            return;
+        }
+
+        KeyframeChannel<Double> channel = axis == 0 ? clip.x : (axis == 1 ? clip.y : clip.z);
+        double sign = toRelative ? -1.0D : 1.0D;
+        for (Keyframe<Double> keyframe : channel.getKeyframes()) {
+            Vector3d anchor = anchorAtStatic(clip, panel, actor, keyframe.getTick());
+            if (anchor == null) {
+                continue;
+            }
+
+            double delta = axis == 0 ? anchor.x : (axis == 1 ? anchor.y : anchor.z);
+            keyframe.setValue(keyframe.getValue() + sign * delta, true);
+        }
+    }
+
+    /** 按剪辑内 tick 计算追踪锚点位置（与播放端的 TrackerFrame.resolve 对齐）。 */
+    private static Vector3d anchorAtStatic(MultiTrackerClientClip clip, UIFilmPanel panel, IEntity actor, float tick) {
+        TrackerFrame frame = TrackerFrame.resolve(
+            panel.getController().getEntities(), actor, clip.group.get(), 0.0F, 0.0F, 0.0F, tick
+        );
+        if (frame == null) {
+            return null;
+        }
+
+        if (clip.relative.get()) {
+            Position underneath = clip.getUnderneath();
+            if (underneath == null) {
+                return null;
+            }
+
+            frame.relative(underneath, clip.position);
+        }
+
+        return frame.position(clip.offset.get());
+    }
+}

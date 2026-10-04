@@ -1,7 +1,14 @@
 {
   "bbs.ui.camera.clips.bbs:multi_tracker": "多样追踪",
-  "bbs.ui.camera.panels.axis_mode": "轴数值模式",
+  "bbs.ui.camera.panels.axis_mode": "轴模式",
   "bbs.ui.camera.panels.axis_mode.relative": "相对值",
   "bbs.ui.camera.panels.axis_mode.absolute": "绝对值",
+  "bbs.ui.camera.panels.axis_mode_x": "X轴模式",
+  "bbs.ui.camera.panels.axis_mode_y": "Y轴模式",
+  "bbs.ui.camera.panels.axis_mode_z": "Z轴模式",
+  "bbs.ui.camera.panels.axis_axis_mode": "三向轴模式",
+  "bbs.ui.camera.panels.axis_axis_mode.relative": "相对",
+  "bbs.ui.camera.panels.axis_axis_mode.absolute": "绝对",
+  "bbs.ui.camera.panels.axis_axis_mode.custom": "自定义",
   "bbs.ui.camera.panels.axis_anchor": "锚点"
 }
