@@ -1,14 +1,6 @@
 {
   "bbs.ui.camera.clips.bbs:multi_tracker": "Multi Tracker",
-  "bbs.ui.camera.panels.axis_mode": "Axis Mode",
-  "bbs.ui.camera.panels.axis_mode.relative": "Relative",
-  "bbs.ui.camera.panels.axis_mode.absolute": "Absolute",
-  "bbs.ui.camera.panels.axis_mode_x": "X Axis Mode",
-  "bbs.ui.camera.panels.axis_mode_y": "Y Axis Mode",
-  "bbs.ui.camera.panels.axis_mode_z": "Z Axis Mode",
-  "bbs.ui.camera.panels.axis_axis_mode": "Tri-Axis Mode",
-  "bbs.ui.camera.panels.axis_axis_mode.relative": "Relative",
-  "bbs.ui.camera.panels.axis_axis_mode.absolute": "Absolute",
-  "bbs.ui.camera.panels.axis_axis_mode.custom": "Custom",
-  "bbs.ui.camera.panels.axis_anchor": "Anchor"
+  "bbs.ui.camera.panels.axis_anchor": "Anchor",
+  "bbs.ui.camera.panels.xyz.relative": "Relative",
+  "bbs.ui.camera.panels.xyz.absolute": "Absolute"
 }

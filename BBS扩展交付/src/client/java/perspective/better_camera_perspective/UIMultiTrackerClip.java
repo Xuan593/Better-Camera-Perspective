@@ -5,10 +5,9 @@ import mchorse.bbs_mod.camera.data.Angle;
 import mchorse.bbs_mod.camera.data.Point;
 import mchorse.bbs_mod.camera.data.Position;
 import mchorse.bbs_mod.forms.entities.IEntity;
+import mchorse.bbs_mod.forms.forms.utils.Anchor;
 import mchorse.bbs_mod.l10n.L10n;
 import mchorse.bbs_mod.l10n.keys.IKey;
-import mchorse.bbs_mod.settings.values.base.BaseValueBasic;
-import mchorse.bbs_mod.settings.values.core.ValueString;
 import mchorse.bbs_mod.ui.Keys;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.IUIClipsDelegate;
@@ -22,12 +21,10 @@ import mchorse.bbs_mod.ui.film.utils.keyframes.UIFilmKeyframes;
 import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
-import mchorse.bbs_mod.ui.framework.elements.buttons.UICirculate;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIToggle;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIAnchorKeyframeFactory;
-import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIKeyframeFactory;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.clips.Clips;
 import mchorse.bbs_mod.utils.joml.Matrices;
@@ -64,9 +61,6 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     public UIToggle lookAt;
     public UIToggle relative;
     public UIBitToggle active;
-    public UICirculate xMode;
-    public UICirculate yMode;
-    public UICirculate zMode;
 
     public UIMultiTrackerClip(MultiTrackerClientClip clip, IUIClipsDelegate editor) {
         super(clip, editor);
@@ -124,28 +118,8 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.relative = this.toggle(UIKeys.CAMERA_PANELS_RELATIVE, this.clip.relative);
         this.active = (UIBitToggle) this.bind(new UIBitToggle(value -> this.clip.active.set(value)).all(), () -> this.active.setValue(this.clip.active.get()));
 
-        // —— 三向轴模式（v0.3.1）：注册关键帧编辑器里「三向轴模式」轴的用户选择式值 UI ——
-        UIKeyframeFactory.registerProperty("axis_mode_axis", UIAxisModeKeyframeFactory::new);
-
-        // —— 每轴轴模式开关（v0.3.1）：仅当三向轴模式为「自定义」时生效 ——
-        this.xMode = this.axisSwitch(0, this.clip.xMode, "bbs.ui.camera.panels.axis_mode_x");
-        this.yMode = this.axisSwitch(1, this.clip.yMode, "bbs.ui.camera.panels.axis_mode_y");
-        this.zMode = this.axisSwitch(2, this.clip.zMode, "bbs.ui.camera.panels.axis_mode_z");
-    }
-
-    /** 每轴「轴模式」循环开关（相对值 / 绝对值），切换时对该轴 XYZ 关键帧逐帧换算（画面不跳变）。 */
-    private UICirculate axisSwitch(int axis, ValueString modeValue, String labelKey) {
-        UICirculate circul = new UICirculate(c -> {
-            String newMode = c.getValue() == 0 ? "relative" : "absolute";
-            if (!newMode.equals(modeValue.get())) {
-                this.convertAxis(axis, newMode);
-                modeValue.set(newMode);
-            }
-        });
-        circul.addLabel(L10n.lang("bbs.ui.camera.panels.axis_mode.relative"));
-        circul.addLabel(L10n.lang("bbs.ui.camera.panels.axis_mode.absolute"));
-        circul.tooltip(L10n.lang(labelKey));
-        return circul;
+        // —— v1.0：XYZ 关键帧值面板改为「绝对值 + 相对值」双值联动编辑，注册 BCP 专用工厂 ——
+        BcpKeyframeFactories.register();
     }
 
     @Override
@@ -158,7 +132,6 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.panels.add(this.lookAt);
         this.panels.add(this.relative);
         this.panels.add(this.active);
-        this.panels.add(this.section(L10n.lang("bbs.ui.camera.panels.axis_mode"), new UIElement[]{this.xMode, this.yMode, this.zMode}));
     }
 
     @Override
@@ -268,18 +241,16 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 }
             }
 
-            // 多样追踪（v0.3.1）：逐轴按取值模式写入——相对轴存「相对锚点偏移」、绝对轴存相机绝对坐标。
+            // 多样追踪（v1.0）：XYZ 关键帧固定「相对值」语义——存相对锚点的偏移
+            //（「偏移栏」语义，播放时按「锚点 + 关键帧偏移」合成）。
             double ax = 0.0D, ay = 0.0D, az = 0.0D;
-            boolean rel0 = "relative".equals(this.clip.axisMode(0));
-            boolean rel1 = "relative".equals(this.clip.axisMode(1));
-            boolean rel2 = "relative".equals(this.clip.axisMode(2));
-            if ((rel0 || rel1 || rel2) && !this.clip.lookAt.get() && this.isActive(0, 1, 2)) {
+            if (!this.clip.lookAt.get() && this.isActive(0, 1, 2)) {
                 TrackerFrame anchorFrame = this.resolveFrame(position);
                 if (anchorFrame != null) {
                     Vector3d anchor = anchorFrame.position(this.clip.offset.get());
-                    ax = rel0 && this.clip.isActive(0) ? anchor.x : 0.0D;
-                    ay = rel1 && this.clip.isActive(1) ? anchor.y : 0.0D;
-                    az = rel2 && this.clip.isActive(2) ? anchor.z : 0.0D;
+                    ax = this.clip.isActive(0) ? anchor.x : 0.0D;
+                    ay = this.clip.isActive(1) ? anchor.y : 0.0D;
+                    az = this.clip.isActive(2) ? anchor.z : 0.0D;
                 }
             }
             this.insertKeyframe(tick, this.clip.x, newPos.point.x - ax);
@@ -316,86 +287,53 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.keyframes.setClip(this.clip);
         // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
         this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
-        // v0.3.1：补挂「三向轴模式」轴（property 传任意非 null BaseValueBasic，按属性名命中自定义 UI 工厂）
-        this.appendSheet("axis_mode_axis", L10n.lang("bbs.ui.camera.panels.axis_axis_mode"), 0xFF26A69A, this.clip.axisModeAxis, this.clip.xMode);
-        // 每轴开关状态：跟随三向轴（非 custom 时锁定为三向轴模式；custom 时按各自开关并解锁）
-        String mode = this.clip.resolveAxisMode();
-        boolean custom = "custom".equals(mode);
-        this.syncAxisSwitch(this.xMode, this.clip.xMode, custom);
-        this.syncAxisSwitch(this.yMode, this.clip.yMode, custom);
-        this.syncAxisSwitch(this.zMode, this.clip.zMode, custom);
     }
 
     private void appendSheet(String id, IKey title, int color, KeyframeChannel<?> channel) {
-        this.appendSheet(id, title, color, channel, null);
-    }
-
-    private void appendSheet(String id, IKey title, int color, KeyframeChannel<?> channel, BaseValueBasic property) {
         boolean exists = this.keyframes.view.getGraph().getSheets().stream().anyMatch(sheet -> sheet.channel == channel);
         if (!exists) {
-            this.keyframes.view.addSheet(new UIKeyframeSheet(id, title, color, channel, property));
+            this.keyframes.view.addSheet(new UIKeyframeSheet(id, title, color, channel, null));
         }
     }
 
-    private void syncAxisSwitch(UICirculate circul, ValueString modeValue, boolean custom) {
-        circul.setValue("relative".equals(modeValue.get()) ? 0 : 1);
-        circul.setEnabled(custom);
-    }
-
-    // ================= 轴取值模式切换（v0.3.1） =================
-
-    /** 实例包装：每轴开关切换时转换该轴关键帧（画面不跳变）。 */
-    private void convertAxis(int axis, String newMode) {
-        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
-        if (panel == null) {
-            return;
-        }
-        convertAxisStatic(this.clip, panel, axis, "relative".equals(newMode));
-    }
+    // ================= XYZ 双值编辑锚点工具（v1.0） =================
 
     /**
-     * 三向轴模式选择（UIAxisModeKeyframeFactory 调用）。
-     * 相对 ↔ 绝对：每个关键帧值 ± 该时刻锚点位置，转换后摄像机视角状态不变。
-     * 自定义：不批量转换，解锁每轴开关由用户逐轴调节。
+     * 计算剪辑内 tick 处某轴（0=X / 1=Y / 2=Z）的追踪锚点坐标（供 UIXyzKeyframeFactory 双值联动）。
+     * 追踪目标按 anchor 轴在该 tick 的插值优先，回退剪辑属性 selector/group；
+     * 无追踪目标时返回 0（相对值 = 绝对值）。
      */
-    public static void convertAll(MultiTrackerClientClip clip, UIFilmPanel panel, String newMode) {
-        if ("custom".equals(newMode)) {
-            return;
-        }
-        boolean toRelative = "relative".equals(newMode);
-        convertAxisStatic(clip, panel, 0, toRelative);
-        convertAxisStatic(clip, panel, 1, toRelative);
-        convertAxisStatic(clip, panel, 2, toRelative);
-    }
-
-    public static void convertAxisStatic(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, boolean toRelative) {
-        String selector = clip.selector.get();
-        if (selector.isEmpty()) {
-            return;
-        }
-
-        IEntity actor = panel.getController().getEntities().get(selector);
-        if (actor == null) {
-            return;
-        }
-
-        KeyframeChannel<Double> channel = axis == 0 ? clip.x : (axis == 1 ? clip.y : clip.z);
-        double sign = toRelative ? -1.0D : 1.0D;
-        for (Keyframe<Double> keyframe : channel.getKeyframes()) {
-            Vector3d anchor = anchorAtStatic(clip, panel, actor, keyframe.getTick());
-            if (anchor == null) {
-                continue;
+    public static double anchorAxisAt(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
+        String sel = clip.selector.get();
+        String grp = clip.group.get();
+        if (!clip.anchor.isEmpty()) {
+            Anchor anchor = clip.anchor.interpolate(tick);
+            if (anchor != null && anchor.hasTarget()) {
+                sel = anchor.replay;
+                grp = anchor.attachment;
             }
-
-            double delta = axis == 0 ? anchor.x : (axis == 1 ? anchor.y : anchor.z);
-            keyframe.setValue(keyframe.getValue() + sign * delta, true);
         }
+
+        if (sel.isEmpty()) {
+            return 0.0D;
+        }
+
+        IEntity actor = panel.getController().getEntities().get(sel);
+        if (actor == null) {
+            return 0.0D;
+        }
+
+        Vector3d pos = anchorPos(clip, panel, actor, grp, tick);
+        if (pos == null) {
+            return 0.0D;
+        }
+
+        return axis == 0 ? pos.x : (axis == 1 ? pos.y : pos.z);
     }
 
-    /** 按剪辑内 tick 计算追踪锚点位置（与播放端的 TrackerFrame.resolve 对齐）。 */
-    private static Vector3d anchorAtStatic(MultiTrackerClientClip clip, UIFilmPanel panel, IEntity actor, float tick) {
+    private static Vector3d anchorPos(MultiTrackerClientClip clip, UIFilmPanel panel, IEntity actor, String group, float tick) {
         TrackerFrame frame = TrackerFrame.resolve(
-            panel.getController().getEntities(), actor, clip.group.get(), 0.0F, 0.0F, 0.0F, tick
+            panel.getController().getEntities(), actor, group, 0.0F, 0.0F, 0.0F, tick
         );
         if (frame == null) {
             return null;

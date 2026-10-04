@@ -18,7 +18,6 @@ import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.clips.ClipContext;
 import mchorse.bbs_mod.utils.joml.Matrices;
-import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import net.fabricmc.api.EnvType;
@@ -56,17 +55,6 @@ public class MultiTrackerClientClip extends KeyframeClip {
     /** 位掩码（0-2 位移，3-5 角度；默认 63 全开）。 */
     public final ValueInt active = new ValueInt("active", 63, 0, 63);
     /**
-     * 三向轴模式（v0.3.1）：关键帧剪辑界面新增的轴，控制 XYZ 关键帧的取值模式。
-     * 只读取「最新（最晚 tick）关键帧」的值，优先级最高；无关键帧默认 relative。
-     */
-    public final KeyframeChannel<String> axisModeAxis = new KeyframeChannel<>("axis_mode_axis", KeyframeFactories.STRING);
-    /** X 轴模式（v0.3.1）：仅当三向轴模式为 custom 时生效。 */
-    public final ValueString xMode = new ValueString("axis_mode_x", "relative");
-    /** Y 轴模式（v0.3.1）：仅当三向轴模式为 custom 时生效。 */
-    public final ValueString yMode = new ValueString("axis_mode_y", "relative");
-    /** Z 轴模式（v0.3.1）：仅当三向轴模式为 custom 时生效。 */
-    public final ValueString zMode = new ValueString("axis_mode_z", "relative");
-    /**
      * anchor 追踪轴（v0.3）：追踪目标（演员+部位）的时间轴覆盖通道，原理同模型数据的 anchor 轴。
      * 无关键帧 / 空值 → 回退剪辑属性 selector/group；有关键帧非空 → 以 anchor 轴为准；
      * 相邻关键帧目标不同时按 previous/x 过渡插值，跨演员平滑切换。
@@ -83,50 +71,17 @@ public class MultiTrackerClientClip extends KeyframeClip {
         this.add(this.lookAt);
         this.add(this.relative);
         this.add(this.active);
-        this.add(this.axisModeAxis);
-        this.add(this.xMode);
-        this.add(this.yMode);
-        this.add(this.zMode);
         this.add(this.anchor);
-    }
-
-    /** 三向轴模式：只读取最新（最晚 tick）关键帧的值；无关键帧 / 非法值默认 relative。 */
-    public String resolveAxisMode() {
-        List<Keyframe<String>> keyframes = this.axisModeAxis.getKeyframes();
-        if (keyframes.isEmpty()) {
-            return "relative";
-        }
-        String value = keyframes.get(keyframes.size() - 1).getValue();
-        return "relative".equals(value) || "absolute".equals(value) || "custom".equals(value) ? value : "relative";
-    }
-
-    /** 每轴模式（custom 时按各自开关；否则跟随三向轴）。 */
-    public String axisMode(int axis) {
-        String mode = this.resolveAxisMode();
-        if (!"custom".equals(mode)) {
-            return mode;
-        }
-        return switch (axis) {
-            case 0 -> this.xMode.get();
-            case 1 -> this.yMode.get();
-            default -> this.zMode.get();
-        };
     }
 
     @Override
     public void applyClip(ClipContext context, Position position) {
         boolean additive = this.additive.get();
         boolean lookAt = this.lookAt.get();
+        // v1.0：XYZ 关键帧固定为「相对值」语义（锚点 + 关键帧偏移合成；lookAt / 叠加除外）
+        boolean relativeMode = !additive && !lookAt;
 
-        // —— 1) 轴取值模式（v0.3.1）：三向轴模式优先，custom 时逐轴 ——
-        boolean rel0 = "relative".equals(this.axisMode(0));
-        boolean rel1 = "relative".equals(this.axisMode(1));
-        boolean rel2 = "relative".equals(this.axisMode(2));
-        boolean anyRel = rel0 || rel1 || rel2;
-        boolean allAbs = !rel0 && !rel1 && !rel2;
-        boolean relativeMode = !additive && !lookAt && anyRel;
-
-        // —— 2) 追踪目标解析（anchor 轴优先，v0.3）——
+        // —— 1) 追踪目标解析（anchor 轴优先，v0.3）——
         String sel = this.selector.get();
         String grp = this.group.get();
         String fromSel = null;
@@ -162,7 +117,7 @@ public class MultiTrackerClientClip extends KeyframeClip {
             }
         }
 
-        // —— 3) 追踪求值（含过渡混合）——
+        // —— 2) 追踪求值（含过渡混合）——
         boolean tracked = false;
         double anchorX = 0.0D, anchorY = 0.0D, anchorZ = 0.0D;
 
@@ -176,27 +131,19 @@ public class MultiTrackerClientClip extends KeyframeClip {
                     current = lerp(base, current, blend);
                 }
 
-                if (lookAt) {
-                    // lookAt：XYZ 不追踪（关键帧绝对值驱动），仅角度看向目标
-                    position.angle.yaw = this.isActive(3) ? current.angle.yaw : position.angle.yaw;
-                    position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
-                    position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
-                } else if (allAbs) {
-                    // 三向轴=绝对（或 custom 全绝对 / additive）：追踪直接覆盖 XYZ + 角度
-                    position.point.x = this.isActive(0) ? current.point.x : position.point.x;
-                    position.point.y = this.isActive(1) ? current.point.y : position.point.y;
-                    position.point.z = this.isActive(2) ? current.point.z : position.point.z;
+                if (relativeMode) {
+                    // 相对值语义（默认）：存追踪锚点，角度照常覆盖；XYZ 在关键帧插值后合成
+                    anchorX = current.point.x;
+                    anchorY = current.point.y;
+                    anchorZ = current.point.z;
                     position.angle.yaw = this.isActive(3) ? current.angle.yaw : position.angle.yaw;
                     position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
                     position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
                 } else {
-                    // 存在相对轴：存锚点，XYZ 先落到锚点（super 后对相对轴做「锚点+偏移」合成），角度覆盖
-                    anchorX = current.point.x;
-                    anchorY = current.point.y;
-                    anchorZ = current.point.z;
-                    position.point.x = this.isActive(0) ? anchorX : position.point.x;
-                    position.point.y = this.isActive(1) ? anchorY : position.point.y;
-                    position.point.z = this.isActive(2) ? anchorZ : position.point.z;
+                    // lookAt / 叠加：追踪直接覆盖对应轴（lookAt 时 XYZ 未被覆盖，保持关键帧绝对值）
+                    position.point.x = this.isActive(0) ? current.point.x : position.point.x;
+                    position.point.y = this.isActive(1) ? current.point.y : position.point.y;
+                    position.point.z = this.isActive(2) ? current.point.z : position.point.z;
                     position.angle.yaw = this.isActive(3) ? current.angle.yaw : position.angle.yaw;
                     position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
                     position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
@@ -204,18 +151,18 @@ public class MultiTrackerClientClip extends KeyframeClip {
             }
         }
 
-        // —— 4) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
+        // —— 3) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
         super.applyClip(context, position);
 
-        // —— 5) 相对轴合成（v0.3.1 逐轴）：XYZ = 锚点 + 关键帧偏移（通道为空 = 纯锚点）
+        // —— 4) 相对值语义 + 追踪生效：XYZ = 锚点 + 关键帧偏移（关键帧通道为空 = 纯追踪锚点）
         if (tracked && relativeMode) {
-            if (rel0 && this.isActive(0)) {
+            if (this.isActive(0)) {
                 position.point.x = this.x.isEmpty() ? anchorX : anchorX + position.point.x;
             }
-            if (rel1 && this.isActive(1)) {
+            if (this.isActive(1)) {
                 position.point.y = this.y.isEmpty() ? anchorY : anchorY + position.point.y;
             }
-            if (rel2 && this.isActive(2)) {
+            if (this.isActive(2)) {
                 position.point.z = this.z.isEmpty() ? anchorZ : anchorZ + position.point.z;
             }
         }

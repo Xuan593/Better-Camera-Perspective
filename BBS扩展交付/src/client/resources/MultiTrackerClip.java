@@ -44,22 +44,6 @@ public class MultiTrackerClip extends KeyframeClip {
      */
     public final ValueInt active = new ValueInt("active", 63, 0, 63);
     /**
-     * 三向轴模式（v0.3.1）：关键帧剪辑界面新增的轴，控制 XYZ 关键帧的取值模式。
-     * 值类型为字符串（relative / absolute / custom），关键帧值采用用户选择式编辑。
-     * 只读取「最新（最晚 tick）关键帧」的值，且优先级最高：
-     *   - 无关键帧时默认为 relative；
-     *   - relative：XYZ 关键帧值锁定为相对锚点偏移；
-     *   - absolute：XYZ 关键帧值锁定为绝对值；
-     *   - custom：XYZ 各自按 axis_mode_x/y/z 的每轴开关独立调节。
-     */
-    public final KeyframeChannel<String> axisModeAxis = new KeyframeChannel<>("axis_mode_axis", KeyframeFactories.STRING);
-    /** X 轴模式（v0.3.1）：仅当三向轴模式为 custom 时生效（relative / absolute）。 */
-    public final ValueString xMode = new ValueString("axis_mode_x", "relative");
-    /** Y 轴模式（v0.3.1）：仅当三向轴模式为 custom 时生效。 */
-    public final ValueString yMode = new ValueString("axis_mode_y", "relative");
-    /** Z 轴模式（v0.3.1）：仅当三向轴模式为 custom 时生效。 */
-    public final ValueString zMode = new ValueString("axis_mode_z", "relative");
-    /**
      * anchor 追踪轴（v0.3）：追踪目标的时间轴覆盖通道。
      *
      * 值类型为 {@link Anchor}（replay = 演员稳定 ID，attachment = 模型部位路径），
@@ -78,10 +62,6 @@ public class MultiTrackerClip extends KeyframeClip {
         this.add(this.lookAt);
         this.add(this.relative);
         this.add(this.active);
-        this.add(this.axisModeAxis);
-        this.add(this.xMode);
-        this.add(this.yMode);
-        this.add(this.zMode);
         this.add(this.anchor);
     }
 
