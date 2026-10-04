@@ -3,10 +3,13 @@ package perspective.better_camera_perspective.clips;
 import mchorse.bbs_mod.camera.clips.overwrite.KeyframeClip;
 import mchorse.bbs_mod.camera.data.Point;
 import mchorse.bbs_mod.camera.values.ValuePoint;
+import mchorse.bbs_mod.forms.forms.utils.Anchor;
 import mchorse.bbs_mod.settings.values.core.ValueString;
 import mchorse.bbs_mod.settings.values.numeric.ValueBoolean;
 import mchorse.bbs_mod.settings.values.numeric.ValueInt;
 import mchorse.bbs_mod.utils.clips.Clip;
+import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
+import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 
 /**
  * 多样追踪（MultiTracker）——服务端剪辑类。
@@ -46,6 +49,16 @@ public class MultiTrackerClip extends KeyframeClip {
      * "absolute" = 与「关键帧」剪辑一致的绝对值。
      */
     public final ValueString axisMode = new ValueString("axis_mode", "relative");
+    /**
+     * anchor 追踪轴（v0.3）：追踪目标的时间轴覆盖通道。
+     *
+     * 值类型为 {@link Anchor}（replay = 演员稳定 ID，attachment = 模型部位路径），
+     * 原理同 BBS 模型数据的 anchor 轴：
+     *   - 通道无关键帧 / 关键帧为空值（replay 为空）→ 回退剪辑属性的模型绑定（selector/group）；
+     *   - 通道有关键帧且值非空 → 以 anchor 轴数值为主（该时刻追踪目标 = 关键帧指定的演员+部位）；
+     *   - 相邻关键帧目标不同时按 BBS 的 previous/x 过渡插值，实现跨演员平滑切换。
+     */
+    public final KeyframeChannel<Anchor> anchor = new KeyframeChannel<>("anchor", KeyframeFactories.ANCHOR);
 
     public MultiTrackerClip() {
         this.add(this.selector);
@@ -56,6 +69,7 @@ public class MultiTrackerClip extends KeyframeClip {
         this.add(this.relative);
         this.add(this.active);
         this.add(this.axisMode);
+        this.add(this.anchor);
     }
 
     @Override

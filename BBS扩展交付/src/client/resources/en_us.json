@@ -2,5 +2,6 @@
   "bbs.ui.camera.clips.bbs:multi_tracker": "Multi Tracker",
   "bbs.ui.camera.panels.axis_mode": "Axis Value Mode",
   "bbs.ui.camera.panels.axis_mode.relative": "Relative",
-  "bbs.ui.camera.panels.axis_mode.absolute": "Absolute"
+  "bbs.ui.camera.panels.axis_mode.absolute": "Absolute",
+  "bbs.ui.camera.panels.axis_anchor": "Anchor"
 }

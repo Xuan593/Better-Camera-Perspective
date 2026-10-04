@@ -2,5 +2,6 @@
   "bbs.ui.camera.clips.bbs:multi_tracker": "多样追踪",
   "bbs.ui.camera.panels.axis_mode": "轴数值模式",
   "bbs.ui.camera.panels.axis_mode.relative": "相对值",
-  "bbs.ui.camera.panels.axis_mode.absolute": "绝对值"
+  "bbs.ui.camera.panels.axis_mode.absolute": "绝对值",
+  "bbs.ui.camera.panels.axis_anchor": "锚点"
 }

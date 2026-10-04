@@ -19,3 +19,6 @@ hs_err_pid*
 
 # Common working directory
 run
+
+# 第三方模组解压目录（待反编译源，含超长路径，不入库）
+Addon/

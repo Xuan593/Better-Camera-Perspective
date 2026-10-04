@@ -23,6 +23,7 @@ import mchorse.bbs_mod.ui.framework.elements.buttons.UIButton;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UICirculate;
 import mchorse.bbs_mod.ui.framework.elements.buttons.UIToggle;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeEditor;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIAnchorKeyframeFactory;
 import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.clips.Clips;
@@ -295,6 +296,13 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         super.fillData();
         this.updateDuration(this.clip.duration.get());
         this.keyframes.setClip(this.clip);
+        // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
+        boolean hasAnchorSheet = this.keyframes.view.getGraph().getSheets().stream().anyMatch(sheet -> sheet.channel == this.clip.anchor);
+        if (!hasAnchorSheet) {
+            this.keyframes.view.addSheet(
+                new UIKeyframeSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor, null)
+            );
+        }
         this.axisMode.setValue("relative".equals(this.clip.axisMode.get()) ? 0 : 1);
     }
 

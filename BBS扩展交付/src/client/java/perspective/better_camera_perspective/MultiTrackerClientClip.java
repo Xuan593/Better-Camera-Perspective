@@ -10,6 +10,7 @@ import mchorse.bbs_mod.camera.data.Point;
 import mchorse.bbs_mod.camera.data.Position;
 import mchorse.bbs_mod.camera.values.ValuePoint;
 import mchorse.bbs_mod.forms.entities.IEntity;
+import mchorse.bbs_mod.forms.forms.utils.Anchor;
 import mchorse.bbs_mod.settings.values.core.ValueString;
 import mchorse.bbs_mod.settings.values.numeric.ValueBoolean;
 import mchorse.bbs_mod.settings.values.numeric.ValueInt;
@@ -17,6 +18,8 @@ import mchorse.bbs_mod.utils.MathUtils;
 import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.clips.ClipContext;
 import mchorse.bbs_mod.utils.joml.Matrices;
+import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
+import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
@@ -53,6 +56,12 @@ public class MultiTrackerClientClip extends KeyframeClip {
     public final ValueInt active = new ValueInt("active", 63, 0, 63);
     /** 轴数值模式（v0.2）："relative"（默认）= XYZ 关键帧为相对锚点的偏移；"absolute" = 绝对值。 */
     public final ValueString axisMode = new ValueString("axis_mode", "relative");
+    /**
+     * anchor 追踪轴（v0.3）：追踪目标（演员+部位）的时间轴覆盖通道，原理同模型数据的 anchor 轴。
+     * 无关键帧 / 空值 → 回退剪辑属性 selector/group；有关键帧非空 → 以 anchor 轴为准；
+     * 相邻关键帧目标不同时按 previous/x 过渡插值，跨演员平滑切换。
+     */
+    public final KeyframeChannel<Anchor> anchor = new KeyframeChannel<>("anchor", KeyframeFactories.ANCHOR);
     /** 相对模式所需的进入本剪辑前的相机位置（等效 EntityClip.position）。 */
     public Position position = new Position(0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 
@@ -65,71 +74,96 @@ public class MultiTrackerClientClip extends KeyframeClip {
         this.add(this.relative);
         this.add(this.active);
         this.add(this.axisMode);
+        this.add(this.anchor);
     }
 
     @Override
     public void applyClip(ClipContext context, Position position) {
-        // 1) 追踪求值（TrackerClientClip 的逻辑，去掉 fov 位——fov 始终由关键帧通道驱动）。
         boolean additive = this.additive.get();
         boolean absolute = "absolute".equals(this.axisMode.get());
-        boolean tracked = false;
-        double anchorX = 0.0D, anchorY = 0.0D, anchorZ = 0.0D;
+        boolean lookAt = this.lookAt.get();
+        boolean relativeMode = !additive && !absolute && !lookAt;
 
-        List<IEntity> entities = this.getEntities(context);
-        if (!entities.isEmpty()) {
-            if (!context.applyUnderneath(this.tick.get(), 0.0F, this.position)) {
-                this.position.copy(position);
-            }
+        // —— 1) 追踪目标解析（anchor 轴优先，v0.3）——
+        //     目标 = anchor 通道在当前 tick 的插值结果；通道空 / 空值 → 回退剪辑属性 selector/group。
+        //     过渡（previous/x）：不同目标的关键帧之间平滑插值（fadeIn/fadeOut/目标切换）。
+        String sel = this.selector.get();
+        String grp = this.group.get();
+        String fromSel = null;
+        String fromGrp = null;
+        float blend = 1.0F;
+        boolean blendSource = false;
 
-            TrackerFrame frame = TrackerFrame.resolve(
-                ((CameraClipContext) context).entities, entities.get(0), this.group.get(),
-                position.point.x, position.point.y, position.point.z, context.transition
-            );
-            if (frame != null) {
-                if (this.relative.get()) {
-                    frame.relative(position, this.position);
-                }
-
-                Point offset = this.offset.get();
-                Point angle = this.angle.get();
-                boolean lookAt = this.lookAt.get();
-                Angle newAngle = lookAt ? frame.lookAtAngles(offset, angle) : frame.angles(angle);
-
-                if (lookAt) {
-                    // lookAt：XYZ 不追踪（由关键帧绝对值驱动），仅角度看向目标
-                    position.angle.yaw = this.isActive(3) ? newAngle.yaw : position.angle.yaw;
-                    position.angle.pitch = this.isActive(4) ? newAngle.pitch : position.angle.pitch;
-                    position.angle.roll = this.isActive(5) ? newAngle.roll : position.angle.roll;
-                } else if (additive || absolute) {
-                    // 叠加模式 或 绝对值模式：追踪直接覆盖 XYZ（absolute 下最终由关键帧绝对值覆盖，
-                    // 即与「关键帧」剪辑一致的取值方式；未打关键帧的轴仍停留在追踪锚点）
-                    Vector3d newPosition = frame.position(offset);
-                    position.point.x = this.isActive(0) ? newPosition.x : position.point.x;
-                    position.point.y = this.isActive(1) ? newPosition.y : position.point.y;
-                    position.point.z = this.isActive(2) ? newPosition.z : position.point.z;
-                    position.angle.yaw = this.isActive(3) ? newAngle.yaw : position.angle.yaw;
-                    position.angle.pitch = this.isActive(4) ? newAngle.pitch : position.angle.pitch;
-                    position.angle.roll = this.isActive(5) ? newAngle.roll : position.angle.roll;
-                } else {
-                    // 相对值模式（默认）：先存锚点位置，角度照常覆盖；XYZ 在关键帧插值后合成
-                    Vector3d newPosition = frame.position(offset);
-                    anchorX = newPosition.x;
-                    anchorY = newPosition.y;
-                    anchorZ = newPosition.z;
-                    tracked = true;
-                    position.angle.yaw = this.isActive(3) ? newAngle.yaw : position.angle.yaw;
-                    position.angle.pitch = this.isActive(4) ? newAngle.pitch : position.angle.pitch;
-                    position.angle.roll = this.isActive(5) ? newAngle.roll : position.angle.roll;
+        if (context instanceof CameraClipContext) {
+            Anchor anchor = this.anchor.isEmpty() ? null : this.anchor.interpolate((float) context.relativeTick + context.transition);
+            if (anchor != null) {
+                if (anchor.hasTarget()) {
+                    sel = anchor.replay;
+                    grp = anchor.attachment;
+                    if (anchor.previous != null && anchor.previous.hasTarget() && !anchor.previous.hasSameTarget(anchor)) {
+                        // 目标 A → 目标 B 过渡（如 1tick 绑模型一头部、20tick 绑模型二脚部）
+                        fromSel = anchor.previous.replay;
+                        fromGrp = anchor.previous.attachment;
+                        blend = anchor.x;
+                        blendSource = true;
+                    } else if (anchor.previous != null && !anchor.previous.hasTarget()) {
+                        // fadeIn：从剪辑属性目标平滑切到 anchor 目标
+                        fromSel = this.selector.get();
+                        fromGrp = this.group.get();
+                        blend = anchor.x;
+                        blendSource = true;
+                    }
+                } else if (anchor.previous != null && anchor.previous.hasTarget()) {
+                    // fadeOut：从 anchor 目标平滑切回剪辑属性目标
+                    sel = this.selector.get();
+                    grp = this.group.get();
+                    fromSel = anchor.previous.replay;
+                    fromGrp = anchor.previous.attachment;
+                    blend = 1.0F - anchor.x;
+                    blendSource = true;
                 }
             }
         }
 
-        // 2) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
-        //    additive=false：非空通道直接覆盖对应轴；additive=true：叠加 underneath。
+        // —— 2) 追踪求值（含过渡混合）——
+        boolean tracked = false;
+        double anchorX = 0.0D, anchorY = 0.0D, anchorZ = 0.0D;
+
+        if (!sel.isEmpty()) {
+            Position current = this.track(context, position, sel, grp, lookAt);
+            if (current != null) {
+                tracked = true;
+                if (blendSource && blend < 1.0F) {
+                    Position from = fromSel == null || fromSel.isEmpty() ? null : this.track(context, position, fromSel, fromGrp, lookAt);
+                    Position base = from != null ? from : position.copy();
+                    current = lerp(base, current, blend);
+                }
+
+                if (relativeMode) {
+                    // 相对值模式（默认）：存追踪锚点，角度照常覆盖；XYZ 在关键帧插值后合成
+                    anchorX = current.point.x;
+                    anchorY = current.point.y;
+                    anchorZ = current.point.z;
+                    position.angle.yaw = this.isActive(3) ? current.angle.yaw : position.angle.yaw;
+                    position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
+                    position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
+                } else {
+                    // lookAt / 叠加 / 绝对值：追踪直接覆盖对应轴（lookAt 时 XYZ 未被覆盖，保持关键帧绝对值）
+                    position.point.x = this.isActive(0) ? current.point.x : position.point.x;
+                    position.point.y = this.isActive(1) ? current.point.y : position.point.y;
+                    position.point.z = this.isActive(2) ? current.point.z : position.point.z;
+                    position.angle.yaw = this.isActive(3) ? current.angle.yaw : position.angle.yaw;
+                    position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
+                    position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
+                }
+            }
+        }
+
+        // —— 3) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
         super.applyClip(context, position);
 
-        // 3) 相对值模式 + 追踪生效：XYZ = 锚点 + 关键帧偏移（关键帧通道为空 = 纯追踪锚点）
-        if (tracked) {
+        // —— 4) 相对值模式 + 追踪生效：XYZ = 锚点 + 关键帧偏移（关键帧通道为空 = 纯追踪锚点）
+        if (tracked && relativeMode) {
             if (this.isActive(0)) {
                 position.point.x = this.x.isEmpty() ? anchorX : anchorX + position.point.x;
             }
@@ -140,6 +174,71 @@ public class MultiTrackerClientClip extends KeyframeClip {
                 position.point.z = this.z.isEmpty() ? anchorZ : anchorZ + position.point.z;
             }
         }
+    }
+
+    /** 追踪求值：返回按 active 位过滤后的 Position 副本；目标实体或帧无效时返回 null。 */
+    private Position track(ClipContext context, Position position, String sel, String grp, boolean lookAt) {
+        if (!(context instanceof CameraClipContext camera)) {
+            return null;
+        }
+
+        IEntity entity = camera.entities.get(sel);
+        if (entity == null) {
+            return null;
+        }
+
+        if (!context.applyUnderneath(this.tick.get(), 0.0F, this.position)) {
+            this.position.copy(position);
+        }
+
+        TrackerFrame frame = TrackerFrame.resolve(
+            camera.entities, entity, grp, position.point.x, position.point.y, position.point.z, context.transition
+        );
+        if (frame == null) {
+            return null;
+        }
+
+        if (this.relative.get()) {
+            frame.relative(position, this.position);
+        }
+
+        Point offset = this.offset.get();
+        Point angle = this.angle.get();
+        Angle newAngle = lookAt ? frame.lookAtAngles(offset, angle) : frame.angles(angle);
+        Position result = position.copy();
+        if (lookAt) {
+            // lookAt：XYZ 不追踪（由关键帧绝对值驱动），仅角度看向目标
+            result.angle.yaw = this.isActive(3) ? newAngle.yaw : result.angle.yaw;
+            result.angle.pitch = this.isActive(4) ? newAngle.pitch : result.angle.pitch;
+            result.angle.roll = this.isActive(5) ? newAngle.roll : result.angle.roll;
+        } else {
+            Vector3d newPosition = frame.position(offset);
+            result.point.x = this.isActive(0) ? newPosition.x : result.point.x;
+            result.point.y = this.isActive(1) ? newPosition.y : result.point.y;
+            result.point.z = this.isActive(2) ? newPosition.z : result.point.z;
+            result.angle.yaw = this.isActive(3) ? newAngle.yaw : result.angle.yaw;
+            result.angle.pitch = this.isActive(4) ? newAngle.pitch : result.angle.pitch;
+            result.angle.roll = this.isActive(5) ? newAngle.roll : result.angle.roll;
+        }
+        return result;
+    }
+
+    /** 两个追踪结果按 t 混合（位置/角度逐分量 lerp，角度按最短弧插值）。 */
+    private static Position lerp(Position a, Position b, float t) {
+        Position result = new Position();
+        result.point.x = a.point.x + (b.point.x - a.point.x) * (double) t;
+        result.point.y = a.point.y + (b.point.y - a.point.y) * (double) t;
+        result.point.z = a.point.z + (b.point.z - a.point.z) * (double) t;
+        result.angle.yaw = lerpAngle(a.angle.yaw, b.angle.yaw, t);
+        result.angle.pitch = lerpAngle(a.angle.pitch, b.angle.pitch, t);
+        result.angle.roll = lerpAngle(a.angle.roll, b.angle.roll, t);
+        return result;
+    }
+
+    /** 角度最短弧插值（BBS 角度为弧度制）。 */
+    private static float lerpAngle(float a, float b, float t) {
+        float diff = (float) Math.atan2(Math.sin(b - a), Math.cos(b - a));
+        return a + diff * t;
     }
 
     public boolean isActive(int bit) {
