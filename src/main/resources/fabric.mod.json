@@ -34,6 +34,6 @@
     "fabricloader": ">=${loader_version}",
     "fabric-api": "*",
     "minecraft": "${minecraft_version}",
-    "bbs": ">=2.7"
+    "bbs": ">=2.7-1.20.1"
   }
 }
