@@ -8,8 +8,10 @@ import java.util.function.Consumer;
 import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.film.replays.Replay;
 import mchorse.bbs_mod.forms.entities.IEntity;
+import mchorse.bbs_mod.forms.forms.Form;
 import mchorse.bbs_mod.l10n.L10n;
 import mchorse.bbs_mod.l10n.keys.IKey;
+import mchorse.bbs_mod.settings.values.core.StableIds;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.UIFilmPanel;
 import mchorse.bbs_mod.ui.film.controller.ReplayContextAction;
@@ -28,17 +30,19 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 /**
  * v1.0.1：接管 UIAnchorKeyframeFactory.displayActors（锚点「选择角色」列表）。
  *
- * BBS 原逻辑的问题：
- *  1. 用 entity != null 过滤 —— 新建的演员（Replay）若尚未实例化实体，
- *     列表里就看不到，导致「新建的伪装无法被识别」；
- *  2. 列表平铺且无分组，演员一多无法按组/类别浏览。
+ * 相比 BBS 原逻辑：
+ *  1. 不再按实体实例化状态过滤 —— 影片全部演员（含新建、未实例化的）都能选中；
+ *  2. 按 Replay.category（组/类别）分组做二级选择（一级 = 类别，二级 = 演员，带返回）；
+ *  3. 菜单可滚动（条目 ≥12 自动出现搜索过滤框）。
  *
- * 替换后的行为：
- *  - 显示影片中的全部 Replay（不再按实体实例化状态过滤）；
- *  - 按 Replay.category（组/类别）分组做二级选择：一级 = 类别（含「未分类」），
- *    二级 = 该类别下的演员；只有一个类别时直接平铺；
- *  - 二级菜单带「返回」；菜单本身可滚动（UISimpleContextMenu 内置，条目 ≥12 时
- *    自动出现过滤搜索框），不再受屏幕高度限制只能看到十余个。
+ * v1.0.2：修复「显示名回到猜模型」。
+ *  FormDisplayNameMixin 的反查此前用「formId（类型）相等」匹配，会误伤资产库伪装
+ *  （资产库伪装与影片演员共用同一模板类型时，名称被集体覆盖）—— 该宽匹配已移除；
+ *  但移除后，影片锚点列表里没有自定义名的演员（label/name 为空）退化成显示类型
+ *  （bbs:model 等），多个同类型演员无法区分。
+ *  本处修复：在列表内部做「影片内借用」—— 同一影片里同类型演员若有可辨识名
+ *  （label / form.name），则借用它显示（不影响 FormDisplayNameMixin，资产库不受影响）；
+ *  都没有时兜底显示「类型·短ID」，保证每个条目唯一可区分。
  */
 @Environment(EnvType.CLIENT)
 @Mixin(UIAnchorKeyframeFactory.class)
@@ -90,7 +94,7 @@ public class UIAnchorKeyframeFactoryMixin {
             menu.autoKeys();
             menu.action(Icons.ARROW_LEFT, L10n.lang("bbs.ui.camera.panels.back"), () -> bcp$showActorList(context, value, callback));
             for (Replay replay : list) {
-                bcp$addActor(menu, replay, value, callback);
+                bcp$addActor(menu, replay, value, callback, list);
             }
         });
     }
@@ -104,14 +108,64 @@ public class UIAnchorKeyframeFactoryMixin {
             menu.autoKeys();
             menu.action(Icons.CLOSE, UIKeys.GENERAL_NONE, 16728153, () -> callback.accept(""));
             for (Replay replay : list) {
-                bcp$addActor(menu, replay, value, callback);
+                bcp$addActor(menu, replay, value, callback, list);
             }
         });
     }
 
-    /** 单个演员条目（复用 BBS 的 ReplayContextAction，显示缩略图 + 名称）。 */
-    private static void bcp$addActor(ContextMenuManager menu, Replay replay, String value, Consumer<String> callback) {
+    /** 单个演员条目（复用 BBS 的 ReplayContextAction，显示缩略图 + 可辨识名）。 */
+    private static void bcp$addActor(ContextMenuManager menu, Replay replay, String value, Consumer<String> callback, List<Replay> all) {
         int color = replay.getId().equals(value) ? BBSSettings.primaryColor(0) : 0;
-        menu.action(new ReplayContextAction(replay, IKey.raw(replay.getName()), () -> callback.accept(replay.getId()), color));
+        menu.action(new ReplayContextAction(replay, IKey.raw(bcp$displayName(replay, all)), () -> callback.accept(replay.getId()), color));
+    }
+
+    /** 构建可辨识显示名：label → form.name → 影片内同类型借用 → 类型·短ID。 */
+    private static String bcp$displayName(Replay replay, List<Replay> all) {
+        String label = replay.label.get();
+        if (!label.isEmpty() && !bcp$isCode(label)) {
+            return label;
+        }
+
+        Form form = replay.form.get();
+        if (form != null) {
+            String name = form.name.get();
+            if (!name.isEmpty() && !bcp$isCode(name)) {
+                return name;
+            }
+        }
+
+        // 影片内借用：同类型演员的可辨识名（仅在本影片 Replay 范围内，资产库不受影响）
+        if (form != null) {
+            String formId = form.getFormId();
+            for (Replay other : all) {
+                if (other == replay) {
+                    continue;
+                }
+                Form otherForm = other.form.get();
+                if (otherForm != null && otherForm.getFormId().equals(formId)) {
+                    String otherLabel = other.label.get();
+                    if (!otherLabel.isEmpty() && !bcp$isCode(otherLabel)) {
+                        return otherLabel;
+                    }
+                    String otherName = otherForm.name.get();
+                    if (!otherName.isEmpty() && !bcp$isCode(otherName)) {
+                        return otherName;
+                    }
+                }
+            }
+        }
+
+        // 兜底：类型·短ID，保证每个条目唯一可区分
+        String id = replay.getId();
+        String shortId = id.length() > 4 ? id.substring(0, 4) : id;
+        return (form == null ? "?" : form.getFormId()) + "·" + shortId;
+    }
+
+    /** 判断字符串是否是「数据码」样式（纯 8 位稳定 ID，或 "8位hex - xxx"）。 */
+    private static boolean bcp$isCode(String s) {
+        if (StableIds.isStableId(s)) {
+            return true;
+        }
+        return s.matches("(?i)[0-9a-f]{8}\\s*-\\s*.*");
     }
 }
