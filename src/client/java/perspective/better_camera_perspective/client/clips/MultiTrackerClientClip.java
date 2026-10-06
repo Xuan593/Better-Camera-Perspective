@@ -62,6 +62,13 @@ public class MultiTrackerClientClip extends KeyframeClip {
     public final KeyframeChannel<Anchor> anchor = new KeyframeChannel<>("anchor", KeyframeFactories.ANCHOR);
     /** 相对模式所需的进入本剪辑前的相机位置（等效 EntityClip.position）。 */
     public Position position = new Position(0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
+    /**
+     * v1.1：XYZ 新建关键帧的「主继承模式」（UI 状态，不参与序列化）。
+     * 0 = 相对值（默认）：下一帧新建关键帧继承「相对偏移」；
+     * 1 = 绝对值：下一帧新建关键帧继承「绝对坐标」。
+     * 由关键帧编辑界面的「将主继承相对值 / 将主继承绝对值」按钮切换。
+     */
+    public int inheritMode = 0;
 
     public MultiTrackerClientClip() {
         this.add(this.selector);

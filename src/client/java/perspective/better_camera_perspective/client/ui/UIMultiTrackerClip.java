@@ -287,6 +287,16 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.keyframes.setClip(this.clip);
         // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
         this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
+        // v1.1：给 X / Y / Z 通道设置 seed —— 新建关键帧（无插值段可继承）时按「主继承模式」供给继承值。
+        for (UIKeyframeSheet sheet : this.keyframes.view.getGraph().getSheets()) {
+            if (sheet.channel == this.clip.x) {
+                this.setSeed(sheet, 0);
+            } else if (sheet.channel == this.clip.y) {
+                this.setSeed(sheet, 1);
+            } else if (sheet.channel == this.clip.z) {
+                this.setSeed(sheet, 2);
+            }
+        }
     }
 
     private void appendSheet(String id, IKey title, int color, KeyframeChannel<?> channel) {
@@ -294,6 +304,26 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         if (!exists) {
             this.keyframes.view.addSheet(new UIKeyframeSheet(id, title, color, channel, null));
         }
+    }
+
+    /** v1.1：为 X/Y/Z 通道 sheet 挂「主继承值」seed（无插值段新建关键帧时使用）。 */
+    private void setSeed(UIKeyframeSheet sheet, int axis) {
+        sheet.seed(() -> this.inheritSeedValue(axis));
+    }
+
+    /** 按剪辑主继承模式计算当前播放头处的继承值：相对 = 通道插值；绝对 = 插值 + 锚点。 */
+    private Object inheritSeedValue(int axis) {
+        KeyframeChannel<Double> channel = axis == 0 ? this.clip.x : (axis == 1 ? this.clip.y : this.clip.z);
+        float tick = ((UIFilmKeyframes) this.keyframes.view).getOffset();
+        double relative = channel.isEmpty() ? 0.0D : channel.interpolate(tick);
+        if (this.clip.inheritMode == 0) {
+            return relative;
+        }
+        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+        if (panel == null) {
+            return relative;
+        }
+        return relative + anchorAxisAt(this.clip, panel, axis, tick);
     }
 
     // ================= XYZ 双值编辑锚点工具（v1.0） =================
