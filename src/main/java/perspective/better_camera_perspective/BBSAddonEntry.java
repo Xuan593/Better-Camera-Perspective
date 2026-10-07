@@ -11,17 +11,20 @@ import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.factory.MapFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import perspective.better_camera_perspective.clips.FXClip;
 import perspective.better_camera_perspective.clips.MultiTrackerClip;
 
 /**
  * BBS 附加包服务端入口（fabric.mod.json 的 "bbs-addon" 字段）。
  *
  * 参照 BBS-Cubed 的注册方式：在 BBS 的 RegisterSettingsEvent 事件中把
- * 多样追踪剪辑注册进 BBS 的相机剪辑工厂。
+ * 多样追踪、特效移植剪辑注册进 BBS 的相机剪辑工厂。
  */
 public class BBSAddonEntry implements BBSAddonMod {
     public static final String MULTI_TRACKER_ID = "multi_tracker";
     public static final String MULTI_TRACKER_ICON_COLOR_HEX = "0xFFB74D";
+    /** 特效移植剪辑（v1.2-Alpha 实验性更新）。 */
+    public static final String FX_PORT_ID = "fx_port";
 
     private static final Logger LOGGER = LoggerFactory.getLogger("better_camera_perspective");
 
@@ -30,7 +33,7 @@ public class BBSAddonEntry implements BBSAddonMod {
         try {
             MapFactory<Clip, ClipFactoryData> factory = BBSMod.getFactoryCameraClips();
             if (factory == null) {
-                LOGGER.warn("[BCP] 相机剪辑工厂为空，无法注册「多样追踪」剪辑");
+                LOGGER.warn("[BCP] 相机剪辑工厂为空，无法注册「多样追踪」「特效移植」剪辑");
                 return;
             }
 
@@ -40,8 +43,15 @@ public class BBSAddonEntry implements BBSAddonMod {
                 new ClipFactoryData(Icons.USER, 0xFFB74D)
             );
             LOGGER.info("[BCP] 「多样追踪」剪辑 (MultiTrackerClip) 服务端注册成功");
+
+            factory.register(
+                Link.bbs(FX_PORT_ID),
+                FXClip.class,
+                new ClipFactoryData(Icons.FILM, 0xFF6EC6)
+            );
+            LOGGER.info("[BCP] 「特效移植」剪辑 (FXClip) 服务端注册成功");
         } catch (Exception e) {
-            LOGGER.error("[BCP] 注册「多样追踪」剪辑失败", e);
+            LOGGER.error("[BCP] 注册「多样追踪」「特效移植」剪辑失败", e);
         }
     }
 }

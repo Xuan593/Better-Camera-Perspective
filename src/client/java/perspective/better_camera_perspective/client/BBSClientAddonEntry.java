@@ -3,6 +3,7 @@ package perspective.better_camera_perspective.client;
 import mchorse.bbs_mod.BBSMod;
 import mchorse.bbs_mod.api.BBSAddonMod;
 import mchorse.bbs_mod.api.Subscribe;
+import mchorse.bbs_mod.api.client.events.RegisterClientSettingsEvent;
 import mchorse.bbs_mod.api.client.events.RegisterClipPanelsEvent;
 import mchorse.bbs_mod.api.client.events.RegisterL10nEvent;
 import mchorse.bbs_mod.camera.clips.ClipFactoryData;
@@ -19,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import perspective.better_camera_perspective.BBSAddonEntry;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
+import perspective.better_camera_perspective.client.ui.UIFXClip;
+import perspective.better_camera_perspective.clips.FXClip;
 
 /**
  * BBS 附加包客户端入口（fabric.mod.json 的 "bbs-client-addon" 字段）。
@@ -47,13 +50,33 @@ public class BBSClientAddonEntry implements BBSAddonMod {
                     new ClipFactoryData(Icons.USER, 0xFFB74D)
                 );
                 LOGGER.info("[BCP] 「多样追踪」客户端剪辑类 (MultiTrackerClientClip) 注册成功");
+
+                factory.register(
+                    Link.bbs(BBSAddonEntry.FX_PORT_ID),
+                    FXClip.class,
+                    new ClipFactoryData(Icons.FILM, 0xFF6EC6)
+                );
+                LOGGER.info("[BCP] 「特效移植」客户端剪辑类 (FXClip) 注册成功");
             }
 
             event.register(MultiTrackerClientClip.class, UIMultiTrackerClip::new);
             LOGGER.info("[BCP] 「多样追踪」UI 面板 (UIMultiTrackerClip) 注册成功");
+
+            event.register(FXClip.class, UIFXClip::new);
+            LOGGER.info("[BCP] 「特效移植」UI 面板 (UIFXClip) 注册成功");
+
+            // 特效画面叠加渲染器（色度转场 / 模糊转场）
+            FXOverlays.register();
+            LOGGER.info("[BCP] 「特效移植」画面叠加渲染器 (FXOverlays) 注册成功");
         } catch (Exception e) {
-            LOGGER.error("[BCP] 「多样追踪」客户端注册失败", e);
+            LOGGER.error("[BCP] 「多样追踪」「特效移植」客户端注册失败", e);
         }
+    }
+
+    @Subscribe
+    public void onRegisterClientSettings(RegisterClientSettingsEvent event) {
+        // 设置页「camera perspective」：剪辑可见性筛选
+        BcpSettingsModule.register(event);
     }
 
     @Subscribe
