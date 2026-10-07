@@ -1,6 +1,5 @@
 {
   "bbs.ui.camera.clips.bbs:multi_tracker": "多样追踪",
-  "bbs.ui.camera.clips.bbs:fx_port": "特效移植",
   "bbs.ui.camera.panels.axis_anchor": "锚点",
   "bbs.ui.camera.panels.xyz.relative": "相对值",
   "bbs.ui.camera.panels.xyz.absolute": "绝对值",
@@ -9,18 +8,6 @@
   "bbs.ui.camera.panels.xyz.inherit_tooltip": "点击以设置主继承模式：后续新建关键帧将主继承该模式对应的值",
   "bbs.ui.camera.panels.anchor_uncategorized": "未分类",
   "bbs.ui.camera.panels.back": "返回",
-  "bbs.ui.camera.panels.fx_mode": "特效类型",
-  "bbs.ui.camera.panels.fx_mode_chroma": "色度转场",
-  "bbs.ui.camera.panels.fx_mode_blur": "模糊转场",
-  "bbs.ui.camera.panels.fx.axis.color1": "起始色度",
-  "bbs.ui.camera.panels.fx.axis.color2": "结束色度",
-  "bbs.ui.camera.panels.fx.axis.amount": "覆盖度",
-  "bbs.ui.camera.panels.fx.axis.blur": "模糊强度",
-  "bbs.ui.camera.panels.fx.axis.blurX": "模糊中心 X",
-  "bbs.ui.camera.panels.fx.axis.blurY": "模糊中心 Y",
-  "bbs.ui.camera.panels.fx.axis.spreadMode": "扩散模式",
-  "bbs.ui.camera.panels.fx.axis.spreadType": "扩散类型",
-  "bbs.ui.camera.panels.fx.axis.expr": "扩散表达式",
   "camera_perspective.config.title": "Camera Perspective",
   "camera_perspective.config.tooltip": "摄像机视角附加包设置",
   "camera_perspective.config.clips.title": "剪辑可见性",
@@ -49,6 +36,5 @@
   "camera_perspective.config.clips.bbs:hotbar": "快捷栏",
   "camera_perspective.config.clips.bbs:cinematic": "电影效果",
   "camera_perspective.config.clips.bbs:replay": "重播",
-  "camera_perspective.config.clips.bbs:multi_tracker": "多样追踪",
-  "camera_perspective.config.clips.bbs:fx_port": "特效移植"
+  "camera_perspective.config.clips.bbs:multi_tracker": "多样追踪"
 }

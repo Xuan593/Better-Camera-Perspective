@@ -1,6 +1,5 @@
 {
   "bbs.ui.camera.clips.bbs:multi_tracker": "Multi Tracker",
-  "bbs.ui.camera.clips.bbs:fx_port": "FX Port",
   "bbs.ui.camera.panels.axis_anchor": "Anchor",
   "bbs.ui.camera.panels.xyz.relative": "Relative",
   "bbs.ui.camera.panels.xyz.absolute": "Absolute",
@@ -9,18 +8,6 @@
   "bbs.ui.camera.panels.xyz.inherit_tooltip": "Click to set the primary inherit mode: new keyframes will inherit the value of this mode",
   "bbs.ui.camera.panels.anchor_uncategorized": "Uncategorized",
   "bbs.ui.camera.panels.back": "Back",
-  "bbs.ui.camera.panels.fx_mode": "FX type",
-  "bbs.ui.camera.panels.fx_mode_chroma": "Chroma transition",
-  "bbs.ui.camera.panels.fx_mode_blur": "Blur transition",
-  "bbs.ui.camera.panels.fx.axis.color1": "Start color",
-  "bbs.ui.camera.panels.fx.axis.color2": "End color",
-  "bbs.ui.camera.panels.fx.axis.amount": "Amount",
-  "bbs.ui.camera.panels.fx.axis.blur": "Blur",
-  "bbs.ui.camera.panels.fx.axis.blurX": "Blur center X",
-  "bbs.ui.camera.panels.fx.axis.blurY": "Blur center Y",
-  "bbs.ui.camera.panels.fx.axis.spreadMode": "Spread mode",
-  "bbs.ui.camera.panels.fx.axis.spreadType": "Spread type",
-  "bbs.ui.camera.panels.fx.axis.expr": "Spread expression",
   "camera_perspective.config.title": "Camera Perspective",
   "camera_perspective.config.tooltip": "Camera perspective add-on settings",
   "camera_perspective.config.clips.title": "Clip visibility",
@@ -49,6 +36,5 @@
   "camera_perspective.config.clips.bbs:hotbar": "Hotbar",
   "camera_perspective.config.clips.bbs:cinematic": "Cinematic",
   "camera_perspective.config.clips.bbs:replay": "Replay",
-  "camera_perspective.config.clips.bbs:multi_tracker": "Multi Tracker",
-  "camera_perspective.config.clips.bbs:fx_port": "FX Port"
+  "camera_perspective.config.clips.bbs:multi_tracker": "Multi Tracker"
 }
