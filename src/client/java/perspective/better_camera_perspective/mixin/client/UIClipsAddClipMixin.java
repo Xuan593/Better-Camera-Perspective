@@ -40,11 +40,6 @@ public class UIClipsAddClipMixin {
     private Vector3i addPreview;
 
     @Shadow
-    public UIContext getContext() {
-        throw new AssertionError();
-    }
-
-    @Shadow
     public void addClip(Link type, int tick, int layer, int duration) {
         throw new AssertionError();
     }
@@ -53,7 +48,7 @@ public class UIClipsAddClipMixin {
     private void bcp$showAddClips(UIContext context, Vector3i preview, CallbackInfo ci) {
         if (preview == null) {
             this.addPreview = null;
-            this.getContext().notifyError(UIKeys.CAMERA_TIMELINE_CANT_FIT_NOTIFICATION);
+            context.notifyError(UIKeys.CAMERA_TIMELINE_CANT_FIT_NOTIFICATION);
         } else {
             context.replaceContextMenu(
                 add -> {
