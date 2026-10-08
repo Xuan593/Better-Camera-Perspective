@@ -29,11 +29,17 @@ public class BcpConflictOverlayPanel extends UIOverlayPanel {
     public BcpConflictOverlayPanel(Consumer<String> callback) {
         super(L10n.lang("bbs.ui.camera.conflict.title"));
 
-        // 说明文字
+        // 说明文字（主 + 副）
         UILabel message = UI.label(L10n.lang("bbs.ui.camera.conflict.message"));
-        message.relative(this.content).xy(8, 6).w(1.0F, -16).h(48);
+        message.relative(this.content).xy(8, 6).w(1.0F, -16).h(24);
         message.labelAnchor(0.0F, 0.0F);
         this.content.add(message);
+
+        UILabel hint = UI.label(L10n.lang("bbs.ui.camera.conflict.hint"));
+        hint.relative(this.content).xy(8, 32).w(1.0F, -16).h(20);
+        hint.labelAnchor(0.0F, 0.0F);
+        hint.color(0xFF8B8B8B, true);
+        this.content.add(hint);
 
         // 选项按钮（回调引用字段，点击时字段必然已赋值）
         this.cubedBtn = new UIButton(L10n.lang("bbs.ui.camera.conflict.cubed"), b -> this.select("cubed"));
