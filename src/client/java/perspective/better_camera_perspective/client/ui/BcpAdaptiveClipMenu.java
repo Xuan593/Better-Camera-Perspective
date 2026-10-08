@@ -48,7 +48,7 @@ public class BcpAdaptiveClipMenu extends UIContextMenu {
             }
             rows = Math.max(rows, count);
             UIElement column = new UIElement();
-            column.column(PADDING);
+            column.column(PADDING).vertical();
             for (int i = 0; i < count; i++) {
                 GridActionCell cell = new GridActionCell(actions.get(index++));
                 cell.relative(column).w(1.0F).h(CELL_HEIGHT);
@@ -68,8 +68,10 @@ public class BcpAdaptiveClipMenu extends UIContextMenu {
 
     @Override
     public void setMouse(UIContext context) {
-        int w = this.columnCount * CELL_WIDTH + PADDING * 2;
-        int h = this.rowCount * CELL_HEIGHT + PADDING * 2;
+        // 高度/宽度需包含单元格之间的间距（(n-1)*PADDING）+ 外边距（2*PADDING），
+        // 否则每列第 9、10 个会溢出列容器高度，被 ColumnResizer 自动换到下一列造成重叠
+        int w = this.columnCount * CELL_WIDTH + (this.columnCount + 1) * PADDING;
+        int h = this.rowCount * CELL_HEIGHT + (this.rowCount + 1) * PADDING;
         this.set(context.mouseX(), context.mouseY(), w, h);
         this.bounds(context.menu.overlay, 5);
     }
