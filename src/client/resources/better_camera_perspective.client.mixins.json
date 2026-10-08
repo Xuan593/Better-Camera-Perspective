@@ -10,8 +10,8 @@
     "UIAnchorKeyframeFactoryMixin",
     "UIKeyframeDopeSheetMixin",
     "UIClipsAddClipMixin",
-    "UIClipsLayerHeightMixin",
-    "UISettingsLayoutMixin"
+    "UIClipRendererMixin",
+    "UIClipsLayerHeightMixin"
   ],
   "injectors": {
     "defaultRequire": 1

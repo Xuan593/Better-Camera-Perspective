@@ -12,8 +12,7 @@ import perspective.better_camera_perspective.client.FilmDisplayNames;
 /**
  * UIFilmPanel 相关钩子：
  *  - 构造完成后，把面板登记进 {@link FilmDisplayNames}（Form 显示名反查）；
- *  - 进入摄像机编辑器（fillData）时：剪辑可见性恢复全开（防缺插件崩溃），
- *    并做一次剪辑可见性功能的来源检测（与 BBS Cubed 的冲突询问，会话内幂等）。
+ *  - 进入摄像机编辑器（fillData）时：应用用户保存的剪辑可见性筛选。
  */
 @Mixin(UIFilmPanel.class)
 public abstract class UIFilmPanelMixin {

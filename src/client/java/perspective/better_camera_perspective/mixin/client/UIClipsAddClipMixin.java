@@ -21,23 +21,13 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import perspective.better_camera_perspective.client.BcpConflictManager;
 import perspective.better_camera_perspective.client.BcpVisibility;
 import perspective.better_camera_perspective.client.ui.BcpAdaptiveClipMenu;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * v1.2.4-Alpha：摄像机编辑器右键添加剪辑 —— 自适应多列菜单。
- *
- * 原逻辑在 {@code UIClips.showAddClips} 中直接以 {@code this.factory.getKeys()}
- * 构建一长竖串的剪辑选择菜单；本 mixin 在方法开头接管：
- *  - 兜底触发一次剪辑可见性功能的来源检测（冲突弹窗，仅多来源冲突时弹出）；
- *  - 菜单最前恒定插入「可视性设置」项（列1 第一格，1 号位）；
- *  - 其余剪辑按 {@link BcpVisibility} 过滤；
- *  - 改用自适应多列右键菜单：每列最多 8 个，多出的自动排下一列，各列平均分配。
- */
+/** 接管右键添加剪辑菜单：插入「可视性设置」项、按可见性过滤、换自适应多列菜单；关闭时清掉预览白框 */
 @Environment(EnvType.CLIENT)
 @Mixin(UIClips.class)
 public class UIClipsAddClipMixin {
@@ -55,15 +45,13 @@ public class UIClipsAddClipMixin {
 
     @Inject(method = "showAddClips", at = @At("HEAD"), cancellable = true)
     private void bcp$showAddClips(UIContext context, Vector3i preview, CallbackInfo ci) {
-        BcpConflictManager.checkAndShow(context);
-
         if (preview == null) {
             this.addPreview = null;
             context.notifyError(UIKeys.CAMERA_TIMELINE_CANT_FIT_NOTIFICATION);
         } else {
             List<ContextAction> actions = new ArrayList<>();
 
-            // 「可视性设置」伪条目：恒定排在菜单最前（列1 第一格 = 1 号位），与其他剪辑视觉同格式
+            // 「可视性设置」伪条目：恒定排在菜单最前（列1 第一格 = 1 号位）
             actions.add(new ContextAction(
                 Icons.SETTINGS,
                 L10n.lang("bbs.ui.camera.visibility_settings"),
@@ -84,11 +72,9 @@ public class UIClipsAddClipMixin {
 
             if (!actions.isEmpty()) {
                 BcpAdaptiveClipMenu menu = new BcpAdaptiveClipMenu(actions);
-                // v1.3.3：菜单关闭（选中剪辑 / ESC / 点击外部）时清理添加预览框，
-                // 避免 addPreview 残留导致时间轴上虚框滞留（原版经 ContextMenuManager.onClose 清理，
-                // 本插件直接传菜单实例绕过了该回调，必须补回）
-                menu.getEvents().register(UIRemovedEvent.class, m -> this.addPreview = null);
                 context.replaceContextMenu(menu);
+                // 菜单关闭时清掉预览占位框，否则会残留在原右键位置
+                menu.getEvents().register(UIRemovedEvent.class, (e) -> this.addPreview = null);
             }
             this.addPreview = preview;
         }
