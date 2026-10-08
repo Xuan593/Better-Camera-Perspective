@@ -160,13 +160,13 @@ public class BcpVisibility {
         }
 
         if (context != null) {
+            // 实验版（v1.2.1-Alpha）：检测到 Cubed 时功能直接激活（封锁解除），
+            // 弹窗仅为提示/验证交互 —— 无论点确定、按 X 还是点外部关闭，功能都已可用。
+            blocked = false;
             UIOverlay.addOverlay(context, new BcpConflictOverlayPanel(choice -> {
-                // 实验版（v1.2.1-Alpha）：弹窗仅为模拟与验证交互；
-                // 无论选择「BBS Cubed」还是「Better camera perspective」，都激活本插件功能。
-                // 选择仅本会话有效，不持久化 —— 重启后再次进入 BBS 会重新弹出。
+                // 选择仅记录展示，不改变功能状态（实验版无论选哪个都激活 BC）
                 chosen = choice;
-                blocked = false;
-                LOGGER.info("[BCP] 实验版：弹窗选择 {}（模拟），本插件功能已激活（封锁={}）", choice, blocked);
+                LOGGER.info("[BCP] 实验版：弹窗选择 {}（模拟），本插件功能保持激活", choice);
             }), 460, 300);
         }
     }
