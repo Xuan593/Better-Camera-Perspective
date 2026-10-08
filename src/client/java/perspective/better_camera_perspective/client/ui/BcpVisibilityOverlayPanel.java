@@ -19,13 +19,16 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import perspective.better_camera_perspective.client.BcpVisibility;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
- * v1.2.1-Alpha：「可视性设置」面板（overlay）。
+ * v1.2.1-Alpha → v1.3：「可视性设置」面板（overlay）。
  *
  * 从摄像机编辑器右键添加剪辑菜单中的「可视性设置」项打开。
- * 每个剪辑一行开关；列表按「列数」开关以多列网格排列（默认 2 列，1/2/3 循环切换），
- * 剪辑多时不再是一长竖串，界面更紧凑。
- * 调整即时生效并写盘；底部「返回」关闭面板。
+ * 每个剪辑一行开关；列表按「列数」开关以多列网格排列（默认 2 列，1/2/3 循环切换）。
+ * 调整即时生效并写盘；每次筛选后列表自动重新排列（可见剪辑排前，隐藏剪辑沉底）；
+ * 底部「返回」关闭面板。
  * 进入编辑器时会恢复全开，再次打开本面板会重新应用用户保存的筛选。
  */
 @Environment(EnvType.CLIENT)
@@ -65,7 +68,7 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
         this.rebuild();
     }
 
-    /** 重建列表（初始构建 / 切换列数时） */
+    /** 重建列表（初始构建 / 切换列数 / 筛选调整后自动重排） */
     private void rebuild() {
         this.scroll.removeAll();
 
@@ -75,11 +78,21 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
 
         MapFactory<Clip, ClipFactoryData> factory = BBSMod.getFactoryCameraClips();
         if (factory != null) {
+            // 筛选后自动重排：可见剪辑排前，隐藏剪辑沉底
+            List<Link> keys = new ArrayList<>();
             for (Link key : factory.getKeys()) {
+                keys.add(key);
+            }
+            keys.sort((a, b) -> Boolean.compare(BcpVisibility.getVisible(b), BcpVisibility.getVisible(a)));
+
+            for (Link key : keys) {
                 UIToggle toggle = new UIToggle(
                     UIKeys.C_CLIP.get(key),
                     BcpVisibility.getVisible(key),
-                    t -> BcpVisibility.setVisible(key, t.getValue())
+                    t -> {
+                        BcpVisibility.setVisible(key, t.getValue());
+                        this.rebuild();
+                    }
                 );
                 toggle.relative(grid).w(1.0F).h(20);
                 grid.add(toggle);
