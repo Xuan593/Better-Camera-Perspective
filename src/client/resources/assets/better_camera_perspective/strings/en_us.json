@@ -24,5 +24,13 @@
   "bbs.ui.camera.conflict.settings_applied": "Applied",
   "conflict_features.config.title": "Camera editing settings",
   "conflict_features.config.conflicts.title": "Conflict features",
-  "conflict_features.config.clips_visibility": "Clip visibility"
+  "conflict_features.config.conflicts.tooltip": "Detects features provided by multiple mods (e.g. clip visibility) and lets you pick the mod mode per feature",
+  "conflict_features.config.clips_visibility": "Clip visibility",
+  "clip_processing.config.title": "Clip processing settings",
+  "clip_processing.config.clips.title": "Clip processing settings",
+  "clip_processing.config.clips.tooltip": "Visual settings for clip processing: reorganize animation and clip bar display (name, borders, type colors)",
+  "clip_processing.config.clips.reorganize_animation": "Reorganize animation",
+  "clip_processing.config.clips.clip_names": "Clip name labels",
+  "clip_processing.config.clips.clip_borders": "Clip borders",
+  "clip_processing.config.clips.clip_colors": "Clip type colors"
 }

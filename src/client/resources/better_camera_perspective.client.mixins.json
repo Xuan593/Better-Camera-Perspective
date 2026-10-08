@@ -10,7 +10,9 @@
     "UIAnchorKeyframeFactoryMixin",
     "UIKeyframeDopeSheetMixin",
     "UIClipsAddClipMixin",
-    "UISettingsLayoutMixin"
+    "UISettingsLayoutMixin",
+    "UIClipsMixin",
+    "UIClipRendererMixin"
   ],
   "injectors": {
     "defaultRequire": 1
