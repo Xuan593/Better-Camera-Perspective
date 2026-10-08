@@ -27,8 +27,8 @@
   "conflict_features.config.conflicts.tooltip": "Detects features provided by multiple mods (e.g. clip visibility) and lets you pick the mod mode per feature",
   "conflict_features.config.clips_visibility": "Clip visibility",
   "conflict_features.config.clip_processing.title": "Clip processing settings",
-  "conflict_features.config.clip_processing.tooltip": "Visual settings for clip processing: reorganize animation and clip bar display (name, borders, type colors)",
-  "conflict_features.config.clip_processing.reorganize_animation": "Reorganize animation",
+  "conflict_features.config.clip_processing.tooltip": "Visual settings for clip processing: adjust clip visibility (reorganize transition animation) and clip bar display (name, borders, type colors)",
+  "conflict_features.config.clip_processing.reorganize_animation": "Adjust clip visibility",
   "conflict_features.config.clip_processing.clip_names": "Clip name labels",
   "conflict_features.config.clip_processing.clip_borders": "Clip borders",
   "conflict_features.config.clip_processing.clip_colors": "Clip type colors"
