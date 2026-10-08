@@ -22,7 +22,7 @@
   "bbs.ui.camera.conflict.apply": "Finish and Apply",
   "bbs.ui.camera.conflict.settings_apply": "Apply",
   "bbs.ui.camera.conflict.settings_applied": "Applied",
-  "conflict_features.config.title": "Camera editing settings",
-  "conflict_features.config.conflicts.title": "Camera editing settings",
+  "conflict_features.config.title": "Conflict features",
+  "conflict_features.config.conflicts.title": "Conflict features",
   "conflict_features.config.clips_visibility": "Clip visibility"
 }
