@@ -8,6 +8,8 @@
   "bbs.ui.camera.panels.xyz.inherit_tooltip": "Click to set the primary inherit mode: new keyframes will inherit the value of this mode",
   "bbs.ui.camera.panels.anchor_uncategorized": "Uncategorized",
   "bbs.ui.camera.panels.back": "Back",
+  "bbs.ui.camera.panel.columns": "Columns: %s",
+  "bbs.ui.camera.panel.columns.tooltip": "Switch the number of columns (1 / 2 / 3)",
   "bbs.ui.camera.visibility_settings": "Visibility settings",
   "bbs.ui.camera.conflict.title": "Clip visibility feature conflict",
   "bbs.ui.camera.conflict.message": "Multiple mods provide the same clip visibility feature. Which mod's mode do you prefer?",
