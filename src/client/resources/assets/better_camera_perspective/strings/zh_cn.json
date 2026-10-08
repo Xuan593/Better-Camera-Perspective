@@ -15,5 +15,14 @@
   "bbs.ui.camera.conflict.message": "检测到多个模组提供相同的“剪辑可见性筛选”功能，你倾向于哪一 Mod 的模式？",
   "bbs.ui.camera.conflict.hint": "选择后点击确定，将按所选模组的模式运行",
   "bbs.ui.camera.conflict.cubed": "BBS Cubed（bbsplusplus）",
-  "bbs.ui.camera.conflict.bcp": "Better camera perspective"
+  "bbs.ui.camera.conflict.bcp": "Better camera perspective",
+  "bbs.ui.camera.conflict.clips_visibility": "剪辑可见性筛选",
+  "bbs.ui.camera.conflict.list_title": "冲突功能",
+  "bbs.ui.camera.conflict.list_message": "检测到以下的同一功能有多个MOD来源，请选择以下功能的模式：",
+  "bbs.ui.camera.conflict.apply": "完成选择，开始应用",
+  "bbs.ui.camera.conflict.settings_apply": "应用",
+  "bbs.ui.camera.conflict.settings_applied": "已应用",
+  "conflict_features.config.title": "冲突功能",
+  "conflict_features.config.conflicts.title": "冲突功能",
+  "conflict_features.config.clips_visibility": "剪辑可见性筛选"
 }

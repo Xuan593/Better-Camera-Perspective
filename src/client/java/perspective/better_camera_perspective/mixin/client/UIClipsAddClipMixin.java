@@ -20,6 +20,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import perspective.better_camera_perspective.client.BcpConflictManager;
 import perspective.better_camera_perspective.client.BcpVisibility;
 import perspective.better_camera_perspective.client.ui.BcpAdaptiveClipMenu;
 
@@ -53,7 +54,7 @@ public class UIClipsAddClipMixin {
 
     @Inject(method = "showAddClips", at = @At("HEAD"), cancellable = true)
     private void bcp$showAddClips(UIContext context, Vector3i preview, CallbackInfo ci) {
-        BcpVisibility.checkConflict(context);
+        BcpConflictManager.checkAndShow(context);
 
         if (preview == null) {
             this.addPreview = null;

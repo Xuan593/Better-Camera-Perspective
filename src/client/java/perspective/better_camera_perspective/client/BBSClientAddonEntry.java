@@ -3,6 +3,7 @@ package perspective.better_camera_perspective.client;
 import mchorse.bbs_mod.BBSMod;
 import mchorse.bbs_mod.api.BBSAddonMod;
 import mchorse.bbs_mod.api.Subscribe;
+import mchorse.bbs_mod.api.client.events.RegisterClientSettingsEvent;
 import mchorse.bbs_mod.api.client.events.RegisterClipPanelsEvent;
 import mchorse.bbs_mod.api.client.events.RegisterL10nEvent;
 import mchorse.bbs_mod.camera.clips.ClipFactoryData;
@@ -53,6 +54,15 @@ public class BBSClientAddonEntry implements BBSAddonMod {
             LOGGER.info("[BCP] 「多样追踪」UI 面板 (UIMultiTrackerClip) 注册成功");
         } catch (Exception e) {
             LOGGER.error("[BCP] 「多样追踪」客户端注册失败", e);
+        }
+    }
+
+    @Subscribe
+    public void onRegisterSettings(RegisterClientSettingsEvent event) {
+        try {
+            BcpConflictSettingsModule.register(event);
+        } catch (Exception e) {
+            LOGGER.error("[BCP] 「冲突功能」设置页注册异常", e);
         }
     }
 

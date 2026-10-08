@@ -15,5 +15,14 @@
   "bbs.ui.camera.conflict.message": "Multiple mods provide the same clip visibility feature. Which mod's mode do you prefer?",
   "bbs.ui.camera.conflict.hint": "Pick a mode and press confirm to apply it",
   "bbs.ui.camera.conflict.cubed": "BBS Cubed (bbsplusplus)",
-  "bbs.ui.camera.conflict.bcp": "Better camera perspective"
+  "bbs.ui.camera.conflict.bcp": "Better camera perspective",
+  "bbs.ui.camera.conflict.clips_visibility": "Clip visibility",
+  "bbs.ui.camera.conflict.list_title": "Conflict features",
+  "bbs.ui.camera.conflict.list_message": "The following features are provided by multiple mods. Choose the mode for each feature:",
+  "bbs.ui.camera.conflict.apply": "Finish and Apply",
+  "bbs.ui.camera.conflict.settings_apply": "Apply",
+  "bbs.ui.camera.conflict.settings_applied": "Applied",
+  "conflict_features.config.title": "Conflict features",
+  "conflict_features.config.conflicts.title": "Conflict features",
+  "conflict_features.config.clips_visibility": "Clip visibility"
 }

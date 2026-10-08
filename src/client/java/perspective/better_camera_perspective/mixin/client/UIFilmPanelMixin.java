@@ -24,11 +24,8 @@ public abstract class UIFilmPanelMixin {
 
     @Inject(method = "fillData", at = @At("HEAD"))
     private void bcp$onEnterEditor(CallbackInfo ci) {
-        BcpVisibility.onEnterEditor();
         UIFilmPanel panel = (UIFilmPanel) (Object) this;
         UIContext context = panel.getContext();
-        if (context != null) {
-            BcpVisibility.checkConflict(context);
-        }
+        BcpVisibility.onEnterEditor(context);
     }
 }
