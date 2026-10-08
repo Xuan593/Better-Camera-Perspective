@@ -99,13 +99,11 @@ public class BcpVisibility {
     // 生命周期
     // ---------------------------------------------------------------
 
-    /** 进入摄像机编辑器：按用户要求恢复全开（避免缺插件等异常导致崩溃），不写盘 */
+    /** 进入摄像机编辑器：应用用户保存的筛选（筛选立即生效，避免"筛选被吞"）；无保存时全部可见 */
     public static void onEnterEditor() {
         ensureKeys();
-        for (Map.Entry<String, Boolean> e : runtime.entrySet()) {
-            e.setValue(true);
-        }
-        LOGGER.debug("[BCP] 进入编辑器，剪辑可见性已恢复全开");
+        applySaved();
+        LOGGER.debug("[BCP] 进入编辑器，已应用保存的剪辑可见性筛选");
     }
 
     /** 打开「可视性设置」面板：先应用用户保存的筛选 */
