@@ -130,8 +130,9 @@ public class BcpVisibility {
 
     /**
      * 检测剪辑可见性筛选功能的功能来源（本会话只检测一次）：
-     *  - 仅本插件提供 → 直接解除封锁；
-     *  - 存在 BBS Cubed → 已选过按保存的选择恢复；未选过弹窗询问。
+     *  - 仅本插件提供 → 直接解除封锁（不弹窗）；
+     *  - 存在 BBS Cubed（bbsplusplus）同功能 → 已选过按保存的选择恢复；
+     *    未选过 → 封锁 + 弹窗询问，用户选择后按所选模组模式运行并持久化。
      */
     public static void checkConflict(UIContext context) {
         if (conflictChecked) {
@@ -153,20 +154,20 @@ public class BcpVisibility {
         LOGGER.info("[BCP] 检测到 {}（{} {}）提供相同功能，剪辑可见性筛选已封锁", CUBED_MOD_ID, CUBED_MOD_ID, cubedVersion);
 
         if (chosen != null) {
-            // 实验版：无论保存的选择是哪个，本插件功能均保持激活
-            blocked = false;
-            LOGGER.info("[BCP] 实验版：按已保存选择 {} 恢复（模拟），本插件功能保持激活", chosen);
+            // 按已保存的选择恢复对应模组模式：选 bcp → 本插件激活；选 cubed → 本插件保持封锁
+            blocked = MODE_BCP.equals(chosen);
+            LOGGER.info("[BCP] 按已保存选择 {} 恢复：本插件功能{}", chosen, blocked ? "保持封锁" : "已激活");
             return;
         }
 
+        // 未选过且存在多来源冲突：封锁 + 弹窗询问
+        blocked = true;
         if (context != null) {
-            // 实验版（v1.2.1-Alpha）：检测到 Cubed 时功能直接激活（封锁解除），
-            // 弹窗仅为提示/验证交互 —— 无论点确定、按 X 还是点外部关闭，功能都已可用。
-            blocked = false;
             UIOverlay.addOverlay(context, new BcpConflictOverlayPanel(choice -> {
-                // 选择仅记录展示，不改变功能状态（实验版无论选哪个都激活 BC）
                 chosen = choice;
-                LOGGER.info("[BCP] 实验版：弹窗选择 {}（模拟），本插件功能保持激活", choice);
+                blocked = MODE_BCP.equals(choice);
+                saveConfig();
+                LOGGER.info("[BCP] 弹窗选择 {}：本插件功能{}", choice, blocked ? "保持封锁" : "已激活");
             }), 460, 300);
         }
     }
@@ -208,7 +209,13 @@ public class BcpVisibility {
             }
             map.put("visibility", visibility);
 
-            // 实验版（v1.2.1-Alpha）：冲突选择不持久化，重启后继续弹出模拟弹窗以便验证
+            MapType conflict = new MapType(true);
+            conflict.putBool("resolved", chosen != null);
+            if (chosen != null) {
+                conflict.putString("chosen", chosen);
+            }
+            map.put("conflict", conflict);
+
             if (!DataToString.writeSilently(CONFIG, map)) {
                 LOGGER.warn("[BCP] 剪辑可见性配置写入失败：{}", CONFIG);
             }
@@ -236,9 +243,12 @@ public class BcpVisibility {
                 }
             }
 
-            // 实验版：不再恢复已保存的冲突选择（chosen 保持 null），
-            // 每次新会话进入 BBS 编辑器都会重新弹出模拟弹窗，便于验证交互。
-            LOGGER.info("[BCP] 剪辑可见性配置加载成功：{} 条筛选（实验版：冲突选择不持久化）", saved.size());
+            MapType conflict = map.get("conflict") instanceof MapType ? (MapType) map.get("conflict") : null;
+            if (conflict != null && conflict.getBool("resolved", false)) {
+                String mode = conflict.getString("chosen", "");
+                chosen = MODE_BCP.equals(mode) ? MODE_BCP : (MODE_CUBED.equals(mode) ? MODE_CUBED : null);
+            }
+            LOGGER.info("[BCP] 剪辑可见性配置加载成功：{} 条筛选，冲突选择={}", saved.size(), chosen);
         } catch (Exception e) {
             LOGGER.error("[BCP] 剪辑可见性配置加载异常", e);
         }

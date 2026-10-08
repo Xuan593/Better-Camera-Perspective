@@ -11,9 +11,10 @@
   "bbs.ui.camera.panel.columns": "列数: %s",
   "bbs.ui.camera.panel.columns.tooltip": "切换剪辑列表的列数（1 / 2 / 3 列）",
   "bbs.ui.camera.visibility_settings": "可视性设置",
+  "bbs.ui.camera.clip_grid_title": "添加剪辑",
   "bbs.ui.camera.conflict.title": "剪辑可见性功能冲突",
   "bbs.ui.camera.conflict.message": "检测到多个模组提供相同的“剪辑可见性筛选”功能，你倾向于哪一 Mod 的模式？",
-  "bbs.ui.camera.conflict.hint": "实验版：无论选择哪个，本插件功能都将运行",
+  "bbs.ui.camera.conflict.hint": "选择后点击确定，将按所选模组的模式运行",
   "bbs.ui.camera.conflict.cubed": "BBS Cubed（bbsplusplus）",
   "bbs.ui.camera.conflict.bcp": "Better camera perspective"
 }
