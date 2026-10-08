@@ -22,7 +22,7 @@
   "bbs.ui.camera.conflict.apply": "完成选择，开始应用",
   "bbs.ui.camera.conflict.settings_apply": "应用",
   "bbs.ui.camera.conflict.settings_applied": "已应用",
-  "conflict_features.config.title": "冲突功能",
-  "conflict_features.config.conflicts.title": "摄像机编辑设置",
+  "conflict_features.config.title": "摄像机编辑设置",
+  "conflict_features.config.conflicts.title": "冲突功能",
   "conflict_features.config.clips_visibility": "剪辑可见性筛选"
 }
