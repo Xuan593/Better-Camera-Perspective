@@ -163,9 +163,9 @@ public class BcpVisibility {
             UIOverlay.addOverlay(context, new BcpConflictOverlayPanel(choice -> {
                 // 实验版（v1.2.1-Alpha）：弹窗仅为模拟与验证交互；
                 // 无论选择「BBS Cubed」还是「Better camera perspective」，都激活本插件功能。
+                // 选择仅本会话有效，不持久化 —— 重启后再次进入 BBS 会重新弹出。
                 chosen = choice;
                 blocked = false;
-                saveConfig();
                 LOGGER.info("[BCP] 实验版：弹窗选择 {}（模拟），本插件功能已激活（封锁={}）", choice, blocked);
             }), 460, 300);
         }
@@ -208,13 +208,7 @@ public class BcpVisibility {
             }
             map.put("visibility", visibility);
 
-            MapType conflict = new MapType(true);
-            conflict.putBool("resolved", chosen != null);
-            if (chosen != null) {
-                conflict.putString("chosen", chosen);
-            }
-            map.put("conflict", conflict);
-
+            // 实验版（v1.2.1-Alpha）：冲突选择不持久化，重启后继续弹出模拟弹窗以便验证
             if (!DataToString.writeSilently(CONFIG, map)) {
                 LOGGER.warn("[BCP] 剪辑可见性配置写入失败：{}", CONFIG);
             }
@@ -242,12 +236,9 @@ public class BcpVisibility {
                 }
             }
 
-            MapType conflict = map.get("conflict") instanceof MapType ? (MapType) map.get("conflict") : null;
-            if (conflict != null && conflict.getBool("resolved", false)) {
-                String mode = conflict.getString("chosen", "");
-                chosen = MODE_BCP.equals(mode) ? MODE_BCP : (MODE_CUBED.equals(mode) ? MODE_CUBED : null);
-            }
-            LOGGER.info("[BCP] 剪辑可见性配置加载成功：{} 条筛选，冲突选择={}", saved.size(), chosen);
+            // 实验版：不再恢复已保存的冲突选择（chosen 保持 null），
+            // 每次新会话进入 BBS 编辑器都会重新弹出模拟弹窗，便于验证交互。
+            LOGGER.info("[BCP] 剪辑可见性配置加载成功：{} 条筛选（实验版：冲突选择不持久化）", saved.size());
         } catch (Exception e) {
             LOGGER.error("[BCP] 剪辑可见性配置加载异常", e);
         }
