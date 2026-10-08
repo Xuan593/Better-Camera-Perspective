@@ -19,6 +19,9 @@ import java.io.File;
  * 页面行渲染由 {@code UISettingsLayoutMixin} 注入的自定义行完成：
  *  - 每个功能一行标题 + 一行来源 Mod 按钮（点击即选择）；
  *  - 页末「应用」按钮统一应用全部选择。
+ *
+ * v1.3.2：同模块下新增第二个分类「剪辑处理设置」（clip_processing），
+ * 由 {@code BcpClipProcessing} 注册开关项，位于「冲突功能」分类下方。
  */
 @Environment(EnvType.CLIENT)
 public class BcpConflictSettingsModule {
@@ -44,11 +47,13 @@ public class BcpConflictSettingsModule {
                         }
                         BcpConflictManager.bindChoice(featureId, value);
                     }
+                    // v1.3.2：「剪辑处理设置」分类（位于「冲突功能」下方）
+                    BcpClipProcessing.registerValues(builder);
                 }
             );
-            LOGGER.info("[BCP] 设置页「冲突功能」注册成功，共 {} 个功能", BcpConflictManager.getFeatureIds().size());
+            LOGGER.info("[BCP] 设置页「摄像机编辑设置」注册成功，冲突功能 {} 个", BcpConflictManager.getFeatureIds().size());
         } catch (Exception e) {
-            LOGGER.error("[BCP] 设置页「冲突功能」注册失败", e);
+            LOGGER.error("[BCP] 设置页「摄像机编辑设置」注册失败", e);
         }
     }
 }
