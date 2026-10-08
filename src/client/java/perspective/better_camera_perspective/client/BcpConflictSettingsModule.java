@@ -44,8 +44,6 @@ public class BcpConflictSettingsModule {
                         }
                         BcpConflictManager.bindChoice(featureId, value);
                     }
-                    // 页末「应用」按钮占位值（自定义行渲染）
-                    builder.getString("apply", "");
                 }
             );
             LOGGER.info("[BCP] 设置页「冲突功能」注册成功，共 {} 个功能", BcpConflictManager.getFeatureIds().size());
