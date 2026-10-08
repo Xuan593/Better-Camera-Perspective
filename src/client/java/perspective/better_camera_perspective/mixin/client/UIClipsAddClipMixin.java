@@ -6,6 +6,7 @@ import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.UIClips;
 import mchorse.bbs_mod.ui.framework.UIContext;
+import mchorse.bbs_mod.ui.framework.elements.events.UIRemovedEvent;
 import mchorse.bbs_mod.ui.utils.context.ColorfulContextAction;
 import mchorse.bbs_mod.ui.utils.context.ContextAction;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
@@ -82,7 +83,12 @@ public class UIClipsAddClipMixin {
             }
 
             if (!actions.isEmpty()) {
-                context.replaceContextMenu(new BcpAdaptiveClipMenu(actions));
+                BcpAdaptiveClipMenu menu = new BcpAdaptiveClipMenu(actions);
+                // v1.3.3：菜单关闭（选中剪辑 / ESC / 点击外部）时清理添加预览框，
+                // 避免 addPreview 残留导致时间轴上虚框滞留（原版经 ContextMenuManager.onClose 清理，
+                // 本插件直接传菜单实例绕过了该回调，必须补回）
+                menu.getEvents().register(UIRemovedEvent.class, m -> this.addPreview = null);
+                context.replaceContextMenu(menu);
             }
             this.addPreview = preview;
         }

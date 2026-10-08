@@ -25,11 +25,5 @@
   "conflict_features.config.title": "摄像机编辑设置",
   "conflict_features.config.conflicts.title": "冲突功能",
   "conflict_features.config.conflicts.tooltip": "自动检测由多个 Mod 同时提供的功能（如剪辑可见性筛选），可逐功能选择由哪一 Mod 的模式运行",
-  "conflict_features.config.clips_visibility": "剪辑可见性筛选",
-  "conflict_features.config.clip_processing.title": "剪辑处理设置",
-  "conflict_features.config.clip_processing.tooltip": "调整剪辑可见性（整理剪辑过渡动画）与剪辑条显示（名称、边界线、类型配色）等剪辑处理可视化设置",
-  "conflict_features.config.clip_processing.reorganize_animation": "调整剪辑可见性",
-  "conflict_features.config.clip_processing.clip_names": "剪辑名称显示",
-  "conflict_features.config.clip_processing.clip_borders": "剪辑边界线",
-  "conflict_features.config.clip_processing.clip_colors": "剪辑类型配色"
+  "conflict_features.config.clips_visibility": "剪辑可见性筛选"
 }
