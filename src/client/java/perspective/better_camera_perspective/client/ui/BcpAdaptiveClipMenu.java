@@ -10,18 +10,18 @@ import net.fabricmc.api.Environment;
 import java.util.List;
 
 /**
- * v1.2.4-Alpha：自适应多列右键剪辑菜单。
+ * v1.3：自适应多列右键剪辑菜单。
  *
- * 取代 BBS 一长竖串右键菜单：每列最多 8 个剪辑，多出的自动排到下一列，
+ * 取代 BBS 一长竖串右键菜单：每列最多 10 个剪辑，多出的自动排到下一列，
  * 各列数量尽量平均（列优先：前几列多 1 个）。
- * 列数 = 剪辑数量 / 8 四舍五入（最小 1 列），如 17 个 → 2 列（9+8），20 个 → 3 列（7+7+6）。
+ * 列数 = 剪辑数量 / 10 四舍五入（最小 1 列）；若平均后每列仍超过 10 个则加 1 列。
  * 仍为右键菜单形态（跟随鼠标弹出、外部点击 / ESC 关闭）。
  */
 @Environment(EnvType.CLIENT)
 public class BcpAdaptiveClipMenu extends UIContextMenu {
     public static final int CELL_WIDTH = 132;
     public static final int CELL_HEIGHT = 22;
-    public static final int MAX_PER_COLUMN = 8;
+    public static final int MAX_PER_COLUMN = 10;
     public static final int PADDING = 4;
 
     private final UIElement columns;
@@ -31,7 +31,11 @@ public class BcpAdaptiveClipMenu extends UIContextMenu {
 
     public BcpAdaptiveClipMenu(List<ContextAction> actions) {
         this.actionCount = actions.size();
-        this.columnCount = Math.max(1, Math.round(actions.size() / (float) MAX_PER_COLUMN));
+        int k = Math.max(1, Math.round(actions.size() / (float) MAX_PER_COLUMN));
+        while (k > 1 && (actions.size() + k - 1) / k > MAX_PER_COLUMN) {
+            k++;
+        }
+        this.columnCount = k;
         int base = actions.size() / this.columnCount;
         int extra = actions.size() % this.columnCount;
         this.rowCount = base + (extra > 0 ? 1 : 0);
