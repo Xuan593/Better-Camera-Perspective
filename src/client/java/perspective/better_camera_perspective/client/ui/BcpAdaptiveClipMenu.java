@@ -18,7 +18,7 @@ import java.util.List;
  */
 @Environment(EnvType.CLIENT)
 public class BcpAdaptiveClipMenu extends UIContextMenu {
-    public static final int CELL_WIDTH = 132;
+    public static final int CELL_WIDTH = 88;
     public static final int CELL_HEIGHT = 22;
     public static final int MAX_PER_COLUMN = 10;
     public static final int MAX_COLUMNS = 5;
