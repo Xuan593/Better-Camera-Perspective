@@ -32,7 +32,7 @@ import java.util.List;
  * 原逻辑在 {@code UIClips.showAddClips} 中直接以 {@code this.factory.getKeys()}
  * 构建一长竖串的剪辑选择菜单；本 mixin 在方法开头接管：
  *  - 兜底触发一次剪辑可见性功能的来源检测（冲突弹窗，仅多来源冲突时弹出）；
- *  - 功能未封锁时，菜单最前插入「可视性设置」项；
+ *  - 菜单最前恒定插入「可视性设置」项（列1 第一格，1 号位）；
  *  - 其余剪辑按 {@link BcpVisibility} 过滤；
  *  - 改用自适应多列右键菜单：每列最多 8 个，多出的自动排下一列，各列平均分配。
  */
@@ -61,14 +61,12 @@ public class UIClipsAddClipMixin {
         } else {
             List<ContextAction> actions = new ArrayList<>();
 
-            // 「可视性设置」伪条目：排在菜单最前（「静止」上方），与其他剪辑视觉同格式
-            if (!BcpVisibility.isBlocked()) {
-                actions.add(new ContextAction(
-                    Icons.SETTINGS,
-                    L10n.lang("bbs.ui.camera.visibility_settings"),
-                    () -> BcpVisibility.openVisibilityPanel(context)
-                ));
-            }
+            // 「可视性设置」伪条目：恒定排在菜单最前（列1 第一格 = 1 号位），与其他剪辑视觉同格式
+            actions.add(new ContextAction(
+                Icons.SETTINGS,
+                L10n.lang("bbs.ui.camera.visibility_settings"),
+                () -> BcpVisibility.openVisibilityPanel(context)
+            ));
 
             for (Link key : this.factory.getKeys()) {
                 if (!BcpVisibility.isClipVisible(key)) {

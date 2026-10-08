@@ -106,9 +106,9 @@ public class BcpVisibility {
         LOGGER.debug("[BCP] 进入编辑器，已应用保存的剪辑可见性筛选");
     }
 
-    /** 打开「可视性设置」面板：先应用用户保存的筛选 */
+    /** 打开「可视性设置」面板：入口始终可用（菜单恒定 1 号位），先应用用户保存的筛选 */
     public static void openVisibilityPanel(UIContext context) {
-        if (blocked || context == null) {
+        if (context == null) {
             return;
         }
         applySaved();
@@ -153,7 +153,7 @@ public class BcpVisibility {
 
         if (chosen != null) {
             // 按已保存的选择恢复对应模组模式：选 bcp → 本插件激活；选 cubed → 本插件保持封锁
-            blocked = MODE_BCP.equals(chosen);
+            blocked = !MODE_BCP.equals(chosen);
             LOGGER.info("[BCP] 按已保存选择 {} 恢复：本插件功能{}", chosen, blocked ? "保持封锁" : "已激活");
             return;
         }
@@ -163,7 +163,7 @@ public class BcpVisibility {
         if (context != null) {
             UIOverlay.addOverlay(context, new BcpConflictOverlayPanel(choice -> {
                 chosen = choice;
-                blocked = MODE_BCP.equals(choice);
+                blocked = !MODE_BCP.equals(choice);
                 saveConfig();
                 LOGGER.info("[BCP] 弹窗选择 {}：本插件功能{}", choice, blocked ? "保持封锁" : "已激活");
             }), 460, 300);
