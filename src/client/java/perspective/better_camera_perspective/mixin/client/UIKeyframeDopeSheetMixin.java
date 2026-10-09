@@ -117,14 +117,19 @@ public class UIKeyframeDopeSheetMixin {
         }
 
         KeyframeChannel<Double> channel = (KeyframeChannel<Double>) sheet.channel;
-        double relative = channel.isEmpty() ? 0.0D : channel.interpolate(tick);
-        if (multi.inheritMode == 0) {
-            return relative;
+        double relative;
+        if (channel.isEmpty()) {
+            // v1.4.1：删除所有帧后新建关键帧 → 继承摄像机的默认视角
+            //（当前预览摄像机位置 − 锚点 = 相对偏移，新建帧后摄像机不跳变）
+            UIFilmPanel panel = this.keyframes.getParent(UIFilmPanel.class);
+            relative = panel == null
+                ? 0.0D
+                : UIMultiTrackerClip.cameraAxisAt(panel, axis) - UIMultiTrackerClip.anchorAxisAt(multi, panel, axis, tick);
+        } else {
+            relative = channel.interpolate(tick);
         }
-        UIFilmPanel panel = this.keyframes.getParent(UIFilmPanel.class);
-        if (panel == null) {
-            return relative;
-        }
-        return relative + UIMultiTrackerClip.anchorAxisAt(multi, panel, axis, tick);
+        // v1.4.1：通道值恒为「相对偏移」——相对模式显示相对值；
+        // 绝对模式显示 = 相对 + 锚点 = 摄像机位置（两模式同值，修正 v1.1 绝对模式双倍锚点问题）
+        return relative;
     }
 }

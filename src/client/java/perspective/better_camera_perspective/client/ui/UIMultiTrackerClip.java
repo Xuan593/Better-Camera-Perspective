@@ -100,7 +100,12 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 UIFilmPanel panel = this.getParent(UIFilmPanel.class);
                 if (panel != null) {
                     UIAnchorKeyframeFactory.displayActors(
-                        this.getContext(), panel.getController().getEntities(), this.clip.selector.get(), i -> this.clip.selector.set(i)
+                        this.getContext(), panel.getController().getEntities(), this.clip.selector.get(),
+                        // v1.4.1：选中锚点目标后自动归零 XYZ 相对值（摄像机贴回锚点，避免旧相对偏移把相机甩远）
+                        i -> {
+                            this.clip.selector.set(i);
+                            resetXyzRelative(this.clip);
+                        }
                     );
                 }
             }
@@ -109,7 +114,12 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.group = new UIButton(
             UIKeys.GENERIC_KEYFRAMES_ANCHOR_PICK_ATTACHMENT,
             b -> UIAnchorKeyframeFactory.displayAttachments(
-                this.getParent(UIFilmPanel.class), this.clip.selector.get(), this.clip.group.get(), attachment -> this.clip.group.set(attachment)
+                this.getParent(UIFilmPanel.class), this.clip.selector.get(), this.clip.group.get(),
+                // v1.4.1：切换绑定部位后同样归零 XYZ 相对值
+                attachment -> {
+                    this.clip.group.set(attachment);
+                    resetXyzRelative(this.clip);
+                }
             )
         );
         this.point = (UIPointModule) this.bind(new UIPointModule(this.editor, UIKeys.CAMERA_PANELS_OFFSET).contextMenu(), () -> this.point.fill(this.clip.offset));
@@ -311,22 +321,60 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         sheet.seed(() -> this.inheritSeedValue(axis));
     }
 
-    /** 按剪辑主继承模式计算当前播放头处的继承值：相对 = 通道插值；绝对 = 插值 + 锚点。 */
+    /** 按剪辑主继承模式计算当前播放头处的继承值：通道值恒为「相对偏移」；绝对显示 = 相对 + 锚点。 */
     private Object inheritSeedValue(int axis) {
         KeyframeChannel<Double> channel = axis == 0 ? this.clip.x : (axis == 1 ? this.clip.y : this.clip.z);
         float tick = ((UIFilmKeyframes) this.keyframes.view).getOffset();
-        double relative = channel.isEmpty() ? 0.0D : channel.interpolate(tick);
-        if (this.clip.inheritMode == 0) {
-            return relative;
+        double relative;
+        if (channel.isEmpty()) {
+            // v1.4.1：删除所有帧后新建关键帧 → 继承摄像机的默认视角（当前预览摄像机位置 − 锚点 = 相对偏移）
+            UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+            relative = panel == null
+                ? 0.0D
+                : cameraAxisAt(panel, axis) - anchorAxisAt(this.clip, panel, axis, tick);
+        } else {
+            relative = channel.interpolate(tick);
         }
-        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
-        if (panel == null) {
-            return relative;
-        }
-        return relative + anchorAxisAt(this.clip, panel, axis, tick);
+        return relative;
     }
 
     // ================= XYZ 双值编辑锚点工具（v1.0） =================
+
+    /**
+     * v1.4.1：当前预览摄像机位置（未取到或异常时返回 0）。
+     * 供「删除所有帧后新建关键帧继承默认视角」使用。
+     */
+    public static double cameraAxisAt(UIFilmPanel panel, int axis) {
+        if (panel == null) {
+            return 0.0D;
+        }
+        try {
+            Vector3d pos = panel.getCameraController().getPosition();
+            return axis == 0 ? pos.x : (axis == 1 ? pos.y : pos.z);
+        } catch (Exception e) {
+            return 0.0D;
+        }
+    }
+
+    /**
+     * v1.4.1：将 XYZ 相对值通道的全部关键帧值归零。
+     * 锚点绑定（模型/部位）变更后调用：摄像机立即贴回锚点，
+     * 避免旧相对偏移把摄像机甩到较远位置。
+     */
+    public static void resetXyzRelative(MultiTrackerClientClip clip) {
+        if (clip == null) {
+            return;
+        }
+        resetChannel(clip.x);
+        resetChannel(clip.y);
+        resetChannel(clip.z);
+    }
+
+    private static void resetChannel(KeyframeChannel<Double> channel) {
+        for (Keyframe keyframe : channel.getKeyframes()) {
+            keyframe.setValue(0.0D);
+        }
+    }
 
     /**
      * 计算剪辑内 tick 处某轴（0=X / 1=Y / 2=Z）的追踪锚点坐标（供 UIXyzKeyframeFactory 双值联动）。

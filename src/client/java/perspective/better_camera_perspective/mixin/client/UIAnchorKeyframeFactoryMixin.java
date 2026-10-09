@@ -18,6 +18,7 @@ import mchorse.bbs_mod.l10n.L10n;
 import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.settings.values.core.StableIds;
 import mchorse.bbs_mod.ui.UIKeys;
+import mchorse.bbs_mod.ui.film.UIClipsPanel;
 import mchorse.bbs_mod.ui.film.UIFilmPanel;
 import mchorse.bbs_mod.ui.film.controller.ReplayContextAction;
 import mchorse.bbs_mod.ui.framework.UIContext;
@@ -25,12 +26,15 @@ import mchorse.bbs_mod.ui.framework.elements.context.UISimpleContextMenu;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.factories.UIAnchorKeyframeFactory;
 import mchorse.bbs_mod.ui.utils.context.ContextMenuManager;
 import mchorse.bbs_mod.ui.utils.icons.Icons;
+import mchorse.bbs_mod.utils.clips.Clip;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
+import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 /**
  * v1.0.1：接管 UIAnchorKeyframeFactory.displayActors（锚点「选择角色」列表）。
@@ -52,8 +56,27 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class UIAnchorKeyframeFactoryMixin {
     @Inject(method = "displayActors", at = @At("HEAD"), cancellable = true)
     private static void bcp$displayActors(UIContext context, Map<String, IEntity> entities, String value, Consumer<String> callback, CallbackInfo ci) {
-        bcp$showActorList(context, value, callback);
+        // v1.4.1：多样追踪剪辑上下文中，选择锚点目标后自动归零 XYZ 相对值
+        //（anchor 轴关键帧选择与属性面板「选取目标」共用此入口）
+        bcp$showActorList(context, value, bcp$wrapReset(context, callback));
         ci.cancel();
+    }
+
+    /** v1.4.1：包装选择回调——若当前编辑上下文是多样追踪剪辑，选择目标后自动归零 XYZ 相对值。 */
+    private static Consumer<String> bcp$wrapReset(UIContext context, Consumer<String> callback) {
+        List<UIFilmPanel> children = context.menu.main.getChildren(UIFilmPanel.class);
+        UIFilmPanel panel = children.isEmpty() ? null : children.get(0);
+        if (panel == null || panel.cameraEditor == null) {
+            return callback;
+        }
+        Clip clip = panel.cameraEditor.getClip();
+        if (!(clip instanceof MultiTrackerClientClip multi)) {
+            return callback;
+        }
+        return id -> {
+            UIMultiTrackerClip.resetXyzRelative(multi);
+            callback.accept(id);
+        };
     }
 
     /** 一级列表：按类别分组（"" 归入「未分类」）；单组时直接平铺。 */
