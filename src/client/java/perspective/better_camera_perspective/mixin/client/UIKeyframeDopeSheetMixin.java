@@ -94,7 +94,7 @@ public class UIKeyframeDopeSheetMixin {
         cir.setReturnValue(true);
     }
 
-    /** 多样追踪 X/Y/Z 通道 → 主继承值；其余返回 null（保持 BBS 原逻辑）。 */
+    /** 多样追踪 X/Y/Z/偏航/俯仰/横滚/视野 通道 → 主继承值；其余返回 null（保持 BBS 原逻辑）。 */
     private Object bcp$inheritValue(UIKeyframeSheet sheet, float tick) {
         if (!(this.keyframes instanceof UIFilmKeyframes film) || film.editor == null) {
             return null;
@@ -112,24 +112,31 @@ public class UIKeyframeDopeSheetMixin {
             axis = 1;
         } else if (sheet.channel == multi.z) {
             axis = 2;
+        } else if (sheet.channel == multi.yaw) {
+            axis = 3;
+        } else if (sheet.channel == multi.pitch) {
+            axis = 4;
+        } else if (sheet.channel == multi.roll) {
+            axis = 5;
+        } else if (sheet.channel == multi.fov) {
+            axis = 6;
         } else {
             return null;
         }
 
         KeyframeChannel<Double> channel = (KeyframeChannel<Double>) sheet.channel;
-        double relative;
+        double value;
         if (channel.isEmpty()) {
-            // v1.4.1：删除所有帧后新建关键帧 → 继承摄像机的默认视角
-            //（当前预览摄像机位置 − 锚点 = 相对偏移，新建帧后摄像机不跳变）
+            // v1.4.1：删除所有帧后新建关键帧 → 继承摄像机的默认视角，不跳变
             UIFilmPanel panel = this.keyframes.getParent(UIFilmPanel.class);
-            relative = panel == null
+            value = panel == null
                 ? 0.0D
-                : UIMultiTrackerClip.cameraAxisAt(panel, axis) - UIMultiTrackerClip.anchorAxisAt(multi, panel, axis, tick);
+                : UIMultiTrackerClip.defaultInheritValue(multi, panel, axis, tick);
         } else {
-            relative = channel.interpolate(tick);
+            value = channel.interpolate(tick);
         }
-        // v1.4.1：通道值恒为「相对偏移」——相对模式显示相对值；
+        // v1.4.1：X/Y/Z 通道值恒为「相对偏移」——相对模式显示相对值；
         // 绝对模式显示 = 相对 + 锚点 = 摄像机位置（两模式同值，修正 v1.1 绝对模式双倍锚点问题）
-        return relative;
+        return value;
     }
 }

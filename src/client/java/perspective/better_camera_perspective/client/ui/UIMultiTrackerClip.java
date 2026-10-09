@@ -1,6 +1,7 @@
 package perspective.better_camera_perspective.client.ui;
 
 import mchorse.bbs_mod.camera.clips.misc.TrackerFrame;
+import mchorse.bbs_mod.camera.controller.CameraController;
 import mchorse.bbs_mod.camera.data.Angle;
 import mchorse.bbs_mod.camera.data.Point;
 import mchorse.bbs_mod.camera.data.Position;
@@ -298,6 +299,7 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
         this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
         // v1.1：给 X / Y / Z 通道设置 seed —— 新建关键帧（无插值段可继承）时按「主继承模式」供给继承值。
+        // v1.4.1：扩展覆盖 偏航/俯仰/横滚/视野（无关键帧新建帧不再默认 0，继承摄像机默认视角）。
         for (UIKeyframeSheet sheet : this.keyframes.view.getGraph().getSheets()) {
             if (sheet.channel == this.clip.x) {
                 this.setSeed(sheet, 0);
@@ -305,6 +307,14 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 this.setSeed(sheet, 1);
             } else if (sheet.channel == this.clip.z) {
                 this.setSeed(sheet, 2);
+            } else if (sheet.channel == this.clip.yaw) {
+                this.setSeed(sheet, 3);
+            } else if (sheet.channel == this.clip.pitch) {
+                this.setSeed(sheet, 4);
+            } else if (sheet.channel == this.clip.roll) {
+                this.setSeed(sheet, 5);
+            } else if (sheet.channel == this.clip.fov) {
+                this.setSeed(sheet, 6);
             }
         }
     }
@@ -323,19 +333,60 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
 
     /** 按剪辑主继承模式计算当前播放头处的继承值：通道值恒为「相对偏移」；绝对显示 = 相对 + 锚点。 */
     private Object inheritSeedValue(int axis) {
-        KeyframeChannel<Double> channel = axis == 0 ? this.clip.x : (axis == 1 ? this.clip.y : this.clip.z);
-        float tick = ((UIFilmKeyframes) this.keyframes.view).getOffset();
-        double relative;
-        if (channel.isEmpty()) {
-            // v1.4.1：删除所有帧后新建关键帧 → 继承摄像机的默认视角（当前预览摄像机位置 − 锚点 = 相对偏移）
-            UIFilmPanel panel = this.getParent(UIFilmPanel.class);
-            relative = panel == null
-                ? 0.0D
-                : cameraAxisAt(panel, axis) - anchorAxisAt(this.clip, panel, axis, tick);
-        } else {
-            relative = channel.interpolate(tick);
+        KeyframeChannel<Double> channel = this.channelAt(axis);
+        if (channel == null) {
+            return null;
         }
-        return relative;
+        float tick = ((UIFilmKeyframes) this.keyframes.view).getOffset();
+        if (!channel.isEmpty()) {
+            return channel.interpolate(tick);
+        }
+        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+        return panel == null ? 0.0D : defaultInheritValue(this.clip, panel, axis, tick);
+    }
+
+    /** v1.4.1：无关键帧时各轴的默认继承值（摄像机当前视角换算）。 */
+    public static double defaultInheritValue(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
+        if (axis <= 2) {
+            // X / Y / Z：摄像机位置 − 追踪锚点 = 相对偏移
+            return cameraAxisAt(panel, axis) - anchorAxisAt(clip, panel, axis, tick);
+        }
+        CameraController controller = panel.getCameraController();
+        if (axis == 3) {
+            return controller.getYaw();
+        }
+        if (axis == 4) {
+            return controller.getPitch();
+        }
+        if (axis == 5) {
+            return controller.getRoll();
+        }
+        if (axis == 6) {
+            return controller.getFOV();
+        }
+        return 0.0D;
+    }
+
+    /** v1.4.1：轴序号 → 通道映射（0=X 1=Y 2=Z 3=偏航 4=俯仰 5=横滚 6=视野）。 */
+    private KeyframeChannel<Double> channelAt(int axis) {
+        switch (axis) {
+            case 0:
+                return this.clip.x;
+            case 1:
+                return this.clip.y;
+            case 2:
+                return this.clip.z;
+            case 3:
+                return this.clip.yaw;
+            case 4:
+                return this.clip.pitch;
+            case 5:
+                return this.clip.roll;
+            case 6:
+                return this.clip.fov;
+            default:
+                return null;
+        }
     }
 
     // ================= XYZ 双值编辑锚点工具（v1.0） =================
@@ -380,12 +431,18 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
      * 计算剪辑内 tick 处某轴（0=X / 1=Y / 2=Z）的追踪锚点坐标（供 UIXyzKeyframeFactory 双值联动）。
      * 追踪目标按 anchor 轴在该 tick 的插值优先，回退剪辑属性 selector/group；
      * 无追踪目标时返回 0（相对值 = 绝对值）。
+     *
+     * v1.4.1：anchor 关键帧与 XYZ 关键帧通常不在同一 tick 新建——tick 处 anchor 插值无目标时，
+     * 回退到 tick 之前最近的非空 anchor 关键帧，保证跨 tick 场景也能读到锚点（摄像机不再被旧相对偏移甩远）。
      */
     public static double anchorAxisAt(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
         String sel = clip.selector.get();
         String grp = clip.group.get();
         if (!clip.anchor.isEmpty()) {
             Anchor anchor = clip.anchor.interpolate(tick);
+            if (anchor == null || !anchor.hasTarget()) {
+                anchor = nearestAnchorAtOrBefore(clip.anchor, tick);
+            }
             if (anchor != null && anchor.hasTarget()) {
                 sel = anchor.replay;
                 grp = anchor.attachment;
@@ -407,6 +464,20 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         }
 
         return axis == 0 ? pos.x : (axis == 1 ? pos.y : pos.z);
+    }
+
+    /** v1.4.1：tick 之前最近的非空 anchor 关键帧（anchor 轴跨 tick 回退读取）。 */
+    private static Anchor nearestAnchorAtOrBefore(KeyframeChannel<Anchor> channel, float tick) {
+        Anchor best = null;
+        float bestTick = -1.0F;
+        for (Keyframe keyframe : channel.getKeyframes()) {
+            Anchor anchor = (Anchor) keyframe.getValue();
+            if (anchor != null && anchor.hasTarget() && keyframe.getTick() <= tick && keyframe.getTick() >= bestTick) {
+                best = anchor;
+                bestTick = keyframe.getTick();
+            }
+        }
+        return best;
     }
 
     private static Vector3d anchorPos(MultiTrackerClientClip clip, UIFilmPanel panel, IEntity actor, String group, float tick) {
