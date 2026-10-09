@@ -459,6 +459,10 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         }
 
         Vector3d pos = anchorPos(clip, panel, actor, grp, tick);
+        if (pos == null && !grp.isEmpty()) {
+            // 部位路径解析失败 → 回退到模型根骨骼，保证锚点能读到（摄像机不再被旧相对偏移甩远）
+            pos = anchorPos(clip, panel, actor, "", tick);
+        }
         if (pos == null) {
             return 0.0D;
         }
