@@ -29,9 +29,8 @@ import java.util.List;
  * 每个剪辑一行开关；列表固定 3 列网格排列，单元格间距翻倍（8px）。
  * 调整即时生效并写盘；底部「返回」关闭面板。
  *
- * V1.5.2-Alpha 排布模式（由「可视化设置」→「预新建剪辑可视化」控制）：
- *  - 原始：筛选后列表自动重新排列（可见剪辑排前，隐藏剪辑沉底）—— 原行为；
- *  - 覆盖：同原始（覆盖模式的三列分类布局作用于右键添加剪辑菜单）；
+ * V1.5.2-Alpha 排布模式（由「可视化设置」→「可视化筛选排布」控制）：
+ *  - 动态：筛选后列表自动重新排列（可见剪辑排前，隐藏剪辑沉底）—— 原行为；
  *  - 静态：筛选后不重排，被隐藏的剪辑在此界面的布局位置不变。
  */
 @Environment(EnvType.CLIENT)
@@ -74,8 +73,8 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
                 keys.add(key);
             }
             // 静态模式：保留原注册顺序，被隐藏的剪辑布局位置不变（不重排）
-            // 原始 / 覆盖模式：筛选后自动重排（可见剪辑排前，隐藏剪辑沉底）
-            if (BcpClipProcessing.getClipMenuLayoutMode() != BcpClipProcessing.LAYOUT_STATIC_IDX) {
+            // 动态模式：筛选后自动重排（可见剪辑排前，隐藏剪辑沉底）
+            if (BcpClipProcessing.getVisibilityLayoutMode() != BcpClipProcessing.LAYOUT_STATIC_IDX) {
                 keys.sort((a, b) -> Boolean.compare(BcpVisibility.getVisible(b), BcpVisibility.getVisible(a)));
             }
 

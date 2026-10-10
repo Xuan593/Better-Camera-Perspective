@@ -48,4 +48,16 @@ public final class ClipCategory {
                 return MISC;
         }
     }
+
+    /** 分类配色（V1.5.2-Alpha 起，用于「混合」模式按分类着色，与「原始」形成视觉区别） */
+    public static int colorOf(int category) {
+        switch (category) {
+            case COVER:
+                return 0xFF4A90D9; // 覆盖：蓝
+            case MODIFIER:
+                return 0xFF5CB85C; // 修改器：绿
+            default:
+                return 0xFF8A8A8A; // 杂项：灰
+        }
+    }
 }
