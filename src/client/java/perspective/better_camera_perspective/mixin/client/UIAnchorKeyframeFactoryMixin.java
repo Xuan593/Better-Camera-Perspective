@@ -72,7 +72,10 @@ public class UIAnchorKeyframeFactoryMixin {
         ci.cancel();
     }
 
-    /** v1.4.1：包装选择回调——若当前编辑上下文是多样追踪剪辑，选择目标后自动归零 XYZ 相对值。 */
+    /**
+     * v1.4.1：包装选择回调——若当前编辑上下文是多样追踪剪辑，选择目标后自动归零当前帧 XYZ 相对值。
+     * v1.5.4-Alpha：只归零当前播放头处关键帧（不再破坏其他帧）。
+     */
     private static Consumer<String> bcp$wrapReset(UIContext context, Consumer<String> callback) {
         List<UIFilmPanel> children = context.menu.main.getChildren(UIFilmPanel.class);
         UIFilmPanel panel = children.isEmpty() ? null : children.get(0);
@@ -84,7 +87,8 @@ public class UIAnchorKeyframeFactoryMixin {
             return callback;
         }
         return id -> {
-            UIMultiTrackerClip.resetXyzRelative(multi);
+            float tick = panel.cameraEditor.getKeyframeCursor(context == null ? 0.0F : context.getTransition()) - (float) multi.tick.get().intValue();
+            UIMultiTrackerClip.resetXyzRelative(multi, tick);
             callback.accept(id);
         };
     }

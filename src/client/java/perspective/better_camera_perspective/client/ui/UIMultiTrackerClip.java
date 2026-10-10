@@ -102,10 +102,11 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 if (panel != null) {
                     UIAnchorKeyframeFactory.displayActors(
                         this.getContext(), panel.getController().getEntities(), this.clip.selector.get(),
-                        // v1.4.1：选中锚点目标后自动归零 XYZ 相对值（摄像机贴回锚点，避免旧相对偏移把相机甩远）
+                        // v1.4.1：选中锚点目标后自动归零当前帧 XYZ 相对值（摄像机贴回锚点，避免旧相对偏移把相机甩远）
+                        // v1.5.4-Alpha：只归零当前播放头处，不再破坏其他帧的关键帧值
                         i -> {
                             this.clip.selector.set(i);
-                            resetXyzRelative(this.clip);
+                            resetXyzRelative(this.clip, this.cursorTick());
                         }
                     );
                 }
@@ -116,10 +117,10 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
             UIKeys.GENERIC_KEYFRAMES_ANCHOR_PICK_ATTACHMENT,
             b -> UIAnchorKeyframeFactory.displayAttachments(
                 this.getParent(UIFilmPanel.class), this.clip.selector.get(), this.clip.group.get(),
-                // v1.4.1：切换绑定部位后同样归零 XYZ 相对值
+                // v1.4.1：切换绑定部位后同样归零当前帧 XYZ 相对值
                 attachment -> {
                     this.clip.group.set(attachment);
-                    resetXyzRelative(this.clip);
+                    resetXyzRelative(this.clip, this.cursorTick());
                 }
             )
         );
@@ -353,18 +354,31 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         }
         CameraController controller = panel.getCameraController();
         if (axis == 3) {
-            return controller.getYaw();
+            // v1.5.4-Alpha：归一化到 (-180, 180]，避免摄像机连续角度值（可能超 ±180）与
+            // 关键帧通道历史值域混用，导致「方位相同、数值天差地别」及播放走超长旋转
+            return normalizeAngle(controller.getYaw());
         }
         if (axis == 4) {
-            return controller.getPitch();
+            return normalizeAngle(controller.getPitch());
         }
         if (axis == 5) {
-            return controller.getRoll();
+            return normalizeAngle(controller.getRoll());
         }
         if (axis == 6) {
             return controller.getFOV();
         }
         return 0.0D;
+    }
+
+    /** v1.5.4-Alpha：角度值归一化到 (-180, 180]。 */
+    private static double normalizeAngle(double angle) {
+        while (angle > 180.0D) {
+            angle -= 360.0D;
+        }
+        while (angle <= -180.0D) {
+            angle += 360.0D;
+        }
+        return angle;
     }
 
     /** v1.4.1：轴序号 → 通道映射（0=X 1=Y 2=Z 3=偏航 4=俯仰 5=横滚 6=视野）。 */
@@ -408,23 +422,34 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     }
 
     /**
-     * v1.4.1：将 XYZ 相对值通道的全部关键帧值归零。
-     * 锚点绑定（模型/部位）变更后调用：摄像机立即贴回锚点，
-     * 避免旧相对偏移把摄像机甩到较远位置。
+     * v1.4.1：将 XYZ 相对值通道在「当前播放头 tick」处的关键帧值归零（无关键帧则补一个 0 值帧）。
+     * 锚点绑定（模型/部位）变更后调用：当前帧摄像机立即贴回锚点，
+     * 避免旧相对偏移把摄像机甩到较远位置；v1.5.4-Alpha 起不再破坏其他帧的关键帧值。
      */
-    public static void resetXyzRelative(MultiTrackerClientClip clip) {
+    public static void resetXyzRelative(MultiTrackerClientClip clip, float tick) {
         if (clip == null) {
             return;
         }
-        resetChannel(clip.x);
-        resetChannel(clip.y);
-        resetChannel(clip.z);
+        resetChannel(clip.x, tick);
+        resetChannel(clip.y, tick);
+        resetChannel(clip.z, tick);
     }
 
-    private static void resetChannel(KeyframeChannel<Double> channel) {
+    /** v1.5.4-Alpha：只归零 tick 处的关键帧；该处无帧时插入一个 0 值帧（保持其他帧不动）。 */
+    private static void resetChannel(KeyframeChannel<Double> channel, float tick) {
         for (Keyframe keyframe : channel.getKeyframes()) {
-            keyframe.setValue(0.0D);
+            if (keyframe.getTick() == tick) {
+                keyframe.setValue(0.0D);
+                return;
+            }
         }
+        channel.insert(tick, 0.0D);
+    }
+
+    /** v1.5.4-Alpha：当前播放头在剪辑内的 tick（与 insertKeyframes 口径一致）。 */
+    private float cursorTick() {
+        UIContext context = this.getContext();
+        return this.editor.getKeyframeCursor(context == null ? 0.0F : context.getTransition()) - (float) this.clip.tick.get().intValue();
     }
 
     /**
