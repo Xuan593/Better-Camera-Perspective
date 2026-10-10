@@ -55,9 +55,14 @@ import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
  *  伪装名 → 影片内同类型借用）时**直接显示该名字**，不再用「ID串 - formId」前缀压制伪装名；
  *  确实没有可辨识名时才用「类型友好名 + 原 ID」兜底（如「模型 31ab03cd」），ID 串作为核心
  *  数据标识不动，仅不参与替代伪装名显示。资产库（伪装）界面自身的悬浮显示名完全不受影响。
+ *
+ * V1.5.3-Alpha 修复（与 BBS-Cubed 共存）：BBS-Cubed（gbeic.bbsplusplus）同样接管了
+ *  displayActors 并用「key + formIdOrName」重写菜单，且其注入先执行，导致本插件的「伪装名
+ *  优先」样式被覆盖。将本 mixin 的 priority 设为最低（0，默认 1000），使本插件的注入在
+ *  Cubed 之后应用与执行，最终菜单由本插件接管，BCP 样式优先生效。
  */
 @Environment(EnvType.CLIENT)
-@Mixin(UIAnchorKeyframeFactory.class)
+@Mixin(value = UIAnchorKeyframeFactory.class, priority = 0)
 public class UIAnchorKeyframeFactoryMixin {
     @Inject(method = "displayActors", at = @At("HEAD"), cancellable = true)
     private static void bcp$displayActors(UIContext context, Map<String, IEntity> entities, String value, Consumer<String> callback, CallbackInfo ci) {
