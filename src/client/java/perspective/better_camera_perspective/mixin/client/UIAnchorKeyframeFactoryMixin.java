@@ -50,6 +50,11 @@ import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
  *  → 影片内同类型演员的可辨识名；都没有时省略名称段（保持 ID串 - formId）。
  *  这样每个条目仍由 ID 前缀保证唯一可区分，名称段负责可辨识；
  *  资产库伪装的名称反查仅发生在锚点列表内部，不会误伤资产库界面（不回归集体覆盖 bug）。
+ *
+ * V1.5.3-Alpha：显示名改为「伪装名优先」—— 有可辨识名（label → form.name → 资产库同类型
+ *  伪装名 → 影片内同类型借用）时**直接显示该名字**，不再用「ID串 - formId」前缀压制伪装名；
+ *  确实没有可辨识名时才用「类型友好名 + 原 ID」兜底（如「模型 31ab03cd」），ID 串作为核心
+ *  数据标识不动，仅不参与替代伪装名显示。资产库（伪装）界面自身的悬浮显示名完全不受影响。
  */
 @Environment(EnvType.CLIENT)
 @Mixin(UIAnchorKeyframeFactory.class)
@@ -148,14 +153,36 @@ public class UIAnchorKeyframeFactoryMixin {
         menu.action(new ReplayContextAction(replay, IKey.raw(bcp$displayName(replay, all, assetNames)), () -> callback.accept(replay.getId()), color));
     }
 
-    /** 构建显示名：ID串 - formId - 伪装名（伪装名拿不到则省略名称段）。 */
+    /** 构建显示名（V1.5.3-Alpha）：有可辨识名 → 直接显示该名；否则「类型友好名 + 原 ID」兜底。 */
     private static String bcp$displayName(Replay replay, List<Replay> all, Map<String, String> assetNames) {
         Form form = replay.form.get();
-        String formId = form == null ? "?" : form.getFormId();
-        String base = replay.getId() + " - " + formId;
-
         String name = bcp$lookupName(replay, form, all, assetNames);
-        return name == null ? base : base + " - " + name;
+        if (name != null) {
+            return name;
+        }
+        String formId = form == null ? "?" : form.getFormId();
+        return bcp$friendlyType(formId) + " " + replay.getId();
+    }
+
+    /** 类型友好名（无可辨识名时的兜底显示）：bbs:model → 模型、bbs:block → 方块等；未知类型保留原 formId。 */
+    private static String bcp$friendlyType(String formId) {
+        if (formId == null) {
+            return "未知类型";
+        }
+        switch (formId) {
+            case "bbs:model":
+                return "模型";
+            case "bbs:block":
+                return "方块";
+            case "bbs:item":
+                return "物品";
+            case "lumencore:spot_light":
+                return "聚光灯";
+            case "lumencore:point_light":
+                return "点光源";
+            default:
+                return formId;
+        }
     }
 
     /** 可辨识名来源（优先级）：label → form.name → 资产库同类型伪装名 → 影片内同类型借用。 */
