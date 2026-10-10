@@ -1,10 +1,10 @@
 package perspective.better_camera_perspective.client;
 
-import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.settings.SettingsBuilder;
 import mchorse.bbs_mod.settings.ui.UIValueMap;
 import mchorse.bbs_mod.ui.framework.elements.UIElement;
-import mchorse.bbs_mod.ui.framework.elements.utils.UILabel;
+import mchorse.bbs_mod.ui.framework.elements.input.text.UITextarea;
+import mchorse.bbs_mod.ui.framework.elements.input.text.utils.TextLine;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.slf4j.Logger;
@@ -21,7 +21,7 @@ import java.util.List;
  *  - {@link #registerValues(SettingsBuilder)}：注册 category「past_logs」+ {@link BcpMarkdownValue}
  *    （在 BcpConflictSettingsModule 的 builder 回调中最先调用，配合 UISettingsOverlayPanelMixin 锁定 1 号位）；
  *  - {@link #register()}：向 UIValueMap 注册 BcpMarkdownValue 的渲染 —— 将打包进 mod 的
- *    「往期日志.md」按行渲染为只读 UILabel（版本标题黄色高亮、引用说明灰色缩进、列表保留）。
+ *    「往期日志.md」全文渲染为可滚动 UITextarea（自动换行 + 垂直滚动查看全部内容）。
  */
 @Environment(EnvType.CLIENT)
 public class BcpPastLogsModule {
@@ -29,13 +29,6 @@ public class BcpPastLogsModule {
     public static final String VALUE_CONTENT = "content";
 
     private static final String MD_RESOURCE = "/assets/better_camera_perspective/md/past_logs.md";
-
-    /** 版本标题（# / ## / ###）高亮色 */
-    private static final int COLOR_TITLE = 0xFFFFC107;
-    /** 正文常规色 */
-    private static final int COLOR_TEXT = 0xFFDDDDDD;
-    /** 引用 / 说明行（>）灰 */
-    private static final int COLOR_QUOTE = 0xFFAAAAAA;
 
     private static final Logger LOGGER = LoggerFactory.getLogger("better_camera_perspective_client");
     private static boolean valuesRegistered = false;
@@ -77,45 +70,19 @@ public class BcpPastLogsModule {
         }
     }
 
-    /** 将 .md 按行渲染为只读 UILabel 列表 */
+    /** 将 .md 全文渲染为可滚动 UITextarea（长内容自适应：自动换行 + 垂直滚动查看全部） */
     private static List<UIElement> renderMarkdown(String md, UIElement row) {
         List<UIElement> els = new ArrayList<>();
         if (md == null || md.isEmpty()) {
             return els;
         }
-        for (String raw : md.split("\n", -1)) {
-            String line = raw.replace("\r", "");
-            if (line.isBlank()) {
-                els.add(lineBreak(row));
-                continue;
-            }
-            int color = COLOR_TEXT;
-            String text = line;
-            if (line.startsWith("### ")) {
-                text = line.substring(4);
-                color = COLOR_TITLE;
-            } else if (line.startsWith("## ")) {
-                text = line.substring(3);
-                color = COLOR_TITLE;
-            } else if (line.startsWith("# ")) {
-                text = line.substring(2);
-                color = COLOR_TITLE;
-            } else if (line.startsWith("> ")) {
-                text = "▍" + line.substring(2);
-                color = COLOR_QUOTE;
-            } else if (line.matches("\\s*[-*]\\s+.*")) {
-                text = "· " + line.replaceFirst("\\s*[-*]\\s+", "");
-            }
-            UILabel label = new UILabel(IKey.raw(text), color);
-            label.relative(row).w(1.0F).h(12);
-            els.add(label);
-        }
+        UITextarea<TextLine> area = new UITextarea<>(s -> {
+            // 只读查看：忽略编辑回调
+        });
+        area.setText(md);
+        area.lineHeight(12).wrap(true).background(true);
+        area.relative(row).w(1.0F).h(480);
+        els.add(area);
         return els;
-    }
-
-    private static UIElement lineBreak(UIElement row) {
-        UIElement spacer = new UIElement();
-        spacer.relative(row).w(1.0F).h(4);
-        return spacer;
     }
 }
