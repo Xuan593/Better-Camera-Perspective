@@ -28,9 +28,7 @@ import perspective.better_camera_perspective.client.ui.BcpCategorizedClipMenu;
 import perspective.better_camera_perspective.client.ui.ClipCategory;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /** 接管右键添加剪辑菜单：插入「可视性设置」项、按可见性过滤、按可视化模式换菜单；关闭时清掉预览白框 */
 @Environment(EnvType.CLIENT)
@@ -91,19 +89,11 @@ public class UIClipsAddClipMixin {
                 context.replaceContextMenu(menu);
                 menu.getEvents().register(UIRemovedEvent.class, (e) -> this.addPreview = null);
             } else {
-                // 「原始」「混合」模式：自适应多列菜单；混合模式下剪辑按分类排序（覆盖→修改器→杂项）
+                // 「原始」「静态」模式：自适应多列菜单。
+                // 静态模式作用于可视性筛选面板（隐藏剪辑保留原位），此处菜单展示与原始一致。
                 List<ContextAction> actions = new ArrayList<>();
                 actions.add(visibilityAction);
-                if (mode == BcpClipProcessing.LAYOUT_MIXED_IDX) {
-                    List<Integer> order = IntStream.range(0, clipActions.size()).boxed()
-                        .sorted(Comparator.comparingInt((Integer i) -> ClipCategory.of(clipKeys.get(i))))
-                        .toList();
-                    for (Integer i : order) {
-                        actions.add(clipActions.get(i));
-                    }
-                } else {
-                    actions.addAll(clipActions);
-                }
+                actions.addAll(clipActions);
                 BcpAdaptiveClipMenu menu = new BcpAdaptiveClipMenu(actions);
                 context.replaceContextMenu(menu);
                 // 菜单关闭时清掉预览占位框，否则会残留在原右键位置

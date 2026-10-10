@@ -50,7 +50,8 @@ public class BcpVisibility {
     public static void openVisibilityPanel(UIContext context) {
         if (context == null) return;
         applySaved();
-        UIOverlay.addOverlay(context, new BcpVisibilityOverlayPanel(), 460, 440);
+        // V1.5.2-Alpha：面板水平 / 垂直尺寸各削减 40%（460→276，440→264）
+        UIOverlay.addOverlay(context, new BcpVisibilityOverlayPanel(), 276, 264);
     }
 
     public static void setVisible(Link type, boolean visible) {

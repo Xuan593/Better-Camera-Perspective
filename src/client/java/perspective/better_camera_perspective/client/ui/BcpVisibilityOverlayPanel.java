@@ -16,18 +16,23 @@ import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.factory.MapFactory;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import perspective.better_camera_perspective.client.BcpClipProcessing;
 import perspective.better_camera_perspective.client.BcpVisibility;
 
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * v1.2.1-Alpha → v1.3.2：「可视性设置」面板（overlay）。
+ * v1.2.1-Alpha → v1.3.2 → V1.5.2-Alpha：「可视性设置」面板（overlay）。
  *
  * 从摄像机编辑器右键添加剪辑菜单中的「可视性设置」项打开。
  * 每个剪辑一行开关；列表固定 3 列网格排列，单元格间距翻倍（8px）。
- * 调整即时生效并写盘；每次筛选后列表自动重新排列（可见剪辑排前，隐藏剪辑沉底）；
- * 底部「返回」关闭面板。
+ * 调整即时生效并写盘；底部「返回」关闭面板。
+ *
+ * V1.5.2-Alpha 排布模式（由「可视化设置」→「预新建剪辑可视化」控制）：
+ *  - 原始：筛选后列表自动重新排列（可见剪辑排前，隐藏剪辑沉底）—— 原行为；
+ *  - 覆盖：同原始（覆盖模式的三列分类布局作用于右键添加剪辑菜单）；
+ *  - 静态：筛选后不重排，被隐藏的剪辑在此界面的布局位置不变。
  */
 @Environment(EnvType.CLIENT)
 public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
@@ -64,12 +69,15 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
 
         MapFactory<Clip, ClipFactoryData> factory = BBSMod.getFactoryCameraClips();
         if (factory != null) {
-            // 筛选后自动重排：可见剪辑排前，隐藏剪辑沉底
             List<Link> keys = new ArrayList<>();
             for (Link key : factory.getKeys()) {
                 keys.add(key);
             }
-            keys.sort((a, b) -> Boolean.compare(BcpVisibility.getVisible(b), BcpVisibility.getVisible(a)));
+            // 静态模式：保留原注册顺序，被隐藏的剪辑布局位置不变（不重排）
+            // 原始 / 覆盖模式：筛选后自动重排（可见剪辑排前，隐藏剪辑沉底）
+            if (BcpClipProcessing.getClipMenuLayoutMode() != BcpClipProcessing.LAYOUT_STATIC_IDX) {
+                keys.sort((a, b) -> Boolean.compare(BcpVisibility.getVisible(b), BcpVisibility.getVisible(a)));
+            }
 
             for (Link key : keys) {
                 UIToggle toggle = new UIToggle(
