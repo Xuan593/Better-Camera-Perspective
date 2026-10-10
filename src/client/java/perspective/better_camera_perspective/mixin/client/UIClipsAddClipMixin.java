@@ -28,9 +28,7 @@ import perspective.better_camera_perspective.client.ui.BcpCategorizedClipMenu;
 import perspective.better_camera_perspective.client.ui.ClipCategory;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
-import java.util.stream.IntStream;
 
 /** 接管右键添加剪辑菜单：插入「可视性设置」项、按可见性过滤、按可视化模式换菜单；关闭时清掉预览白框 */
 @Environment(EnvType.CLIENT)
@@ -88,22 +86,6 @@ public class UIClipsAddClipMixin {
                 }
                 all.addAll(clipActions);
                 BcpCategorizedClipMenu menu = new BcpCategorizedClipMenu(all, categories);
-                context.replaceContextMenu(menu);
-                menu.getEvents().register(UIRemovedEvent.class, (e) -> this.addPreview = null);
-            } else if (mode == BcpClipProcessing.LAYOUT_MIXED_IDX) {
-                // 「混合」模式：保持原始自适应多列布局，并按分类排序（覆盖→修改器→杂项）+ 按分类着色，
-                // 与「原始」形成明确视觉区别（V1.5.2 修复：此前混合与原始视觉一致）。
-                List<ContextAction> actions = new ArrayList<>();
-                actions.add(visibilityAction);
-                List<Integer> order = IntStream.range(0, clipActions.size()).boxed()
-                    .sorted(Comparator.comparingInt((Integer i) -> ClipCategory.of(clipKeys.get(i))))
-                    .toList();
-                for (Integer i : order) {
-                    ContextAction a = clipActions.get(i);
-                    actions.add(new ColorfulContextAction(a.icon, a.label, a.runnable,
-                        ClipCategory.colorOf(ClipCategory.of(clipKeys.get(i)))));
-                }
-                BcpAdaptiveClipMenu menu = new BcpAdaptiveClipMenu(actions);
                 context.replaceContextMenu(menu);
                 menu.getEvents().register(UIRemovedEvent.class, (e) -> this.addPreview = null);
             } else {

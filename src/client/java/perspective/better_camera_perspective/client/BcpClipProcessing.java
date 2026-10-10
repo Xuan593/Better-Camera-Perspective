@@ -12,11 +12,12 @@ import java.util.List;
  * 设置页「可视化设置」分类（原「剪辑处理设置」，v1.5-Alpha 更名）。
  *
  * V1.5.2-Alpha：拆分为两个独立设置项 ——
- *  - 「预创建剪辑可视化」（clip_menu_layout）：原始 / 覆盖 / 混合 —— 右键添加剪辑菜单的布局分类
- *    （混合 = 保持原始动态布局并按分类排序 + 着色，由 UIClipsAddClipMixin 读取）；
+ *  - 「预创建剪辑可视化」（clip_menu_layout）：原始 / 覆盖 —— 右键添加剪辑菜单的布局分类
+ *    （由 UIClipsAddClipMixin 读取）；
  *  - 「可视化筛选排布」（visibility_layout）：动态 / 静态 —— 可视性设置面板的排布
  *    （静态 = 被隐藏的剪辑在筛选界面中的布局位置不变，由 BcpVisibilityOverlayPanel 读取）。
  *
+ * V1.5.2-Alpha（第 3 次修订）：移除「混合」模式（实测不如不混合）。
  * V1.5.1-Alpha：剔除原剪辑条显示三开关（剪辑名称显示 / 剪辑边界线 / 剪辑类型配色），
  * 剪辑条渲染恢复 BBS 原版默认行为。
  */
@@ -27,13 +28,11 @@ public class BcpClipProcessing {
 
     public static final String LAYOUT_ORIGINAL = "original";
     public static final String LAYOUT_OVERRIDE = "override";
-    public static final String LAYOUT_MIXED = "mixed";
     public static final String LAYOUT_DYNAMIC = "dynamic";
     public static final String LAYOUT_STATIC = "static";
 
     public static final int LAYOUT_ORIGINAL_IDX = 0;
     public static final int LAYOUT_OVERRIDE_IDX = 1;
-    public static final int LAYOUT_MIXED_IDX = 2;
     public static final int LAYOUT_DYNAMIC_IDX = 0;
     public static final int LAYOUT_STATIC_IDX = 1;
 
@@ -49,7 +48,7 @@ public class BcpClipProcessing {
         try {
             builder.category("clip_processing");
             layoutValue = new BcpModeValue(KEY_CLIP_MENU_LAYOUT, LAYOUT_ORIGINAL,
-                List.of(LAYOUT_ORIGINAL, LAYOUT_OVERRIDE, LAYOUT_MIXED), MENU_LABEL_PREFIX);
+                List.of(LAYOUT_ORIGINAL, LAYOUT_OVERRIDE), MENU_LABEL_PREFIX);
             builder.register(layoutValue);
             visibilityValue = new BcpModeValue(KEY_VISIBILITY_LAYOUT, LAYOUT_DYNAMIC,
                 List.of(LAYOUT_DYNAMIC, LAYOUT_STATIC), VISIBILITY_LABEL_PREFIX);
@@ -60,14 +59,12 @@ public class BcpClipProcessing {
         }
     }
 
-    /** 预创建剪辑可视化：0=原始 1=覆盖 2=混合 */
+    /** 预创建剪辑可视化：0=原始 1=覆盖 */
     public static int getClipMenuLayoutMode() {
         if (layoutValue == null) return LAYOUT_ORIGINAL_IDX;
         switch (layoutValue.get()) {
             case LAYOUT_OVERRIDE:
                 return LAYOUT_OVERRIDE_IDX;
-            case LAYOUT_MIXED:
-                return LAYOUT_MIXED_IDX;
             default:
                 return LAYOUT_ORIGINAL_IDX;
         }
