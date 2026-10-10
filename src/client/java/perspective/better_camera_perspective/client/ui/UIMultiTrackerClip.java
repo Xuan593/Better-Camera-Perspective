@@ -422,9 +422,12 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     }
 
     /**
-     * v1.4.1：将 XYZ 相对值通道在「当前播放头 tick」处的关键帧值归零（无关键帧则补一个 0 值帧）。
+     * v1.4.1：将 XYZ 相对值通道在「当前播放头 tick」处的关键帧值归零。
      * 锚点绑定（模型/部位）变更后调用：当前帧摄像机立即贴回锚点，
-     * 避免旧相对偏移把摄像机甩到较远位置；v1.5.4-Alpha 起不再破坏其他帧的关键帧值。
+     * 避免旧相对偏移把摄像机甩到较远位置。
+     * v1.5.4-Alpha：不再破坏其他帧的关键帧值；且**绝不插入新帧**——
+     * 当前 tick 处没有关键帧（如新建剪辑 XYZ 通道为空）时保持原状，
+     * 避免「锁 0」现象（插入 0 值帧会覆盖默认继承值，摄像机被读回 XYZ=0 区域）。
      */
     public static void resetXyzRelative(MultiTrackerClientClip clip, float tick) {
         if (clip == null) {
@@ -435,7 +438,7 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         resetChannel(clip.z, tick);
     }
 
-    /** v1.5.4-Alpha：只归零 tick 处的关键帧；该处无帧时插入一个 0 值帧（保持其他帧不动）。 */
+    /** v1.5.4-Alpha：仅当 tick 处已有关键帧时才归零该帧，绝不新增关键帧。 */
     private static void resetChannel(KeyframeChannel<Double> channel, float tick) {
         for (Keyframe keyframe : channel.getKeyframes()) {
             if (keyframe.getTick() == tick) {
@@ -443,7 +446,6 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 return;
             }
         }
-        channel.insert(tick, 0.0D);
     }
 
     /** v1.5.4-Alpha：当前播放头在剪辑内的 tick（与 insertKeyframes 口径一致）。 */
