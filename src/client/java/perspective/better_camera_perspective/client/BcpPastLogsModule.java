@@ -80,8 +80,12 @@ public class BcpPastLogsModule {
             // 只读查看：忽略编辑回调
         });
         area.setText(md);
-        area.lineHeight(12).wrap(true).background(true);
+        area.lineHeight(16).wrap(true).background(true).padding(8);
+        area.setColor(0xFFF2F2F2, true);
         area.relative(row).w(1.0F).h(480);
+        // 打开时默认从最新版本（顶部）开始查看
+        area.vertical.scrollTo(0);
+        area.horizontal.scrollTo(0);
         els.add(area);
         return els;
     }
