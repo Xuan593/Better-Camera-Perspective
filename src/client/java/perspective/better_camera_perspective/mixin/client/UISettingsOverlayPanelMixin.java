@@ -64,9 +64,18 @@ public class UISettingsOverlayPanelMixin {
                 return;
             }
             int viewportH = this.options.area.h;
+            // 布局未就绪（视口高度无效）时跳过，避免把文本框高度写坏
+            if (viewportH < 128) {
+                return;
+            }
+            int target = viewportH - 8;
             for (IUIElement el : this.options.getChildren()) {
                 if (el instanceof UITextarea) {
-                    ((UITextarea) el).h(Math.max(64, viewportH - 8)).resize();
+                    UITextarea ta = (UITextarea) el;
+                    // 仅高度不同时设置一次；不主动 resize()，避免渲染中重排导致文本丢失
+                    if (ta.area.h != target) {
+                        ta.h(target);
+                    }
                 }
             }
         } catch (Exception e) {
