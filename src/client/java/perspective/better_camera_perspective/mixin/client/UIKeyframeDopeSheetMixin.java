@@ -15,11 +15,16 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
+import perspective.better_camera_perspective.client.BcpKeyframeProcessing;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * v1.1：多样追踪「关键帧打点」主继承模式注入。
@@ -45,6 +50,13 @@ public class UIKeyframeDopeSheetMixin {
     public UIKeyframeSheet getSheet(int mouseY) {
         return null;
     }
+
+    /**
+     * v1.5-Alpha：混合模式下记录「每个通道上次新建的关键帧索引」，
+     * 新建时只解除该帧的选中（保留手动选中的帧），实现前两者的智能融合。
+     */
+    @Unique
+    private final Map<UIKeyframeSheet, Integer> bcp$lastCreatedIndexes = new HashMap<>();
 
     @Inject(method = "addKeyframeAt", at = @At("HEAD"), cancellable = true)
     private void bcp$addKeyframeAt(float tick, int mouseY, CallbackInfoReturnable<Boolean> cir) {
@@ -89,7 +101,18 @@ public class UIKeyframeDopeSheetMixin {
             keyframe.getInterpolation().setInterp(BBSSettings.getDefaultKeyframeInterpolation());
         }
         if (keyframe != null) {
+            // v1.5-Alpha：关键帧被选中状态三模式（默认 / 单体 / 混合）
+            int selectionMode = BcpKeyframeProcessing.getSelectionMode();
+            if (selectionMode == BcpKeyframeProcessing.MODE_SINGLE_IDX) {
+                sheet.selection.clear();
+            } else if (selectionMode == BcpKeyframeProcessing.MODE_MIXED_IDX) {
+                Integer last = this.bcp$lastCreatedIndexes.get(sheet);
+                if (last != null && sheet.selection.has(last)) {
+                    sheet.selection.remove(last);
+                }
+            }
             sheet.selection.add(index);
+            this.bcp$lastCreatedIndexes.put(sheet, index);
         }
         cir.setReturnValue(true);
     }

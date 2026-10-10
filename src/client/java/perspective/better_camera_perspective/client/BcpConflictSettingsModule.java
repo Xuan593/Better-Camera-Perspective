@@ -23,7 +23,10 @@ public class BcpConflictSettingsModule {
                 Icons.FRUSTUM,
                 MODULE_ID,
                 new File(BBSMod.getSettingsFolder(), MODULE_ID + ".json"),
-                BcpClipProcessing::registerValues
+                (builder) -> {
+                    BcpClipProcessing.registerValues(builder);
+                    BcpKeyframeProcessing.registerValues(builder);
+                }
             );
         } catch (Exception e) {
             LOGGER.error("[BCP] 设置页「摄像机编辑设置」注册失败", e);

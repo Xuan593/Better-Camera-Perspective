@@ -21,13 +21,18 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import perspective.better_camera_perspective.client.BcpClipProcessing;
 import perspective.better_camera_perspective.client.BcpVisibility;
 import perspective.better_camera_perspective.client.ui.BcpAdaptiveClipMenu;
+import perspective.better_camera_perspective.client.ui.BcpCategorizedClipMenu;
+import perspective.better_camera_perspective.client.ui.ClipCategory;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.stream.IntStream;
 
-/** 接管右键添加剪辑菜单：插入「可视性设置」项、按可见性过滤、换自适应多列菜单；关闭时清掉预览白框 */
+/** 接管右键添加剪辑菜单：插入「可视性设置」项、按可见性过滤、按可视化模式换菜单；关闭时清掉预览白框 */
 @Environment(EnvType.CLIENT)
 @Mixin(UIClips.class)
 public class UIClipsAddClipMixin {
@@ -49,15 +54,15 @@ public class UIClipsAddClipMixin {
             this.addPreview = null;
             context.notifyError(UIKeys.CAMERA_TIMELINE_CANT_FIT_NOTIFICATION);
         } else {
-            List<ContextAction> actions = new ArrayList<>();
-
             // 「可视性设置」伪条目：恒定排在菜单最前（列1 第一格 = 1 号位）
-            actions.add(new ContextAction(
+            ContextAction visibilityAction = new ContextAction(
                 Icons.SETTINGS,
                 L10n.lang("bbs.ui.camera.visibility_settings"),
                 () -> BcpVisibility.openVisibilityPanel(context)
-            ));
+            );
 
+            List<ContextAction> clipActions = new ArrayList<>();
+            List<String> clipKeys = new ArrayList<>();
             for (Link key : this.factory.getKeys()) {
                 if (!BcpVisibility.isClipVisible(key)) {
                     continue;
@@ -67,10 +72,38 @@ public class UIClipsAddClipMixin {
                 ContextAction action = data.color != 0
                     ? new ColorfulContextAction(data.icon, UIKeys.C_CLIP.get(key), run, data.color)
                     : new ContextAction(data.icon, UIKeys.C_CLIP.get(key), run);
-                actions.add(action);
+                clipActions.add(action);
+                clipKeys.add(key.toString());
             }
 
-            if (!actions.isEmpty()) {
+            int mode = BcpClipProcessing.getClipMenuLayoutMode();
+            if (mode == BcpClipProcessing.LAYOUT_OVERRIDE_IDX) {
+                // 「覆盖」模式：参考 FS2.8 的三列分类菜单（搜索框 + 覆盖/修改器/杂项）
+                List<ContextAction> all = new ArrayList<>();
+                all.add(visibilityAction);
+                int[] categories = new int[1 + clipActions.size()];
+                categories[0] = ClipCategory.COVER;
+                for (int i = 0; i < clipActions.size(); i++) {
+                    categories[i + 1] = ClipCategory.of(clipKeys.get(i));
+                }
+                all.addAll(clipActions);
+                BcpCategorizedClipMenu menu = new BcpCategorizedClipMenu(all, categories);
+                context.replaceContextMenu(menu);
+                menu.getEvents().register(UIRemovedEvent.class, (e) -> this.addPreview = null);
+            } else {
+                // 「原始」「混合」模式：自适应多列菜单；混合模式下剪辑按分类排序（覆盖→修改器→杂项）
+                List<ContextAction> actions = new ArrayList<>();
+                actions.add(visibilityAction);
+                if (mode == BcpClipProcessing.LAYOUT_MIXED_IDX) {
+                    List<Integer> order = IntStream.range(0, clipActions.size()).boxed()
+                        .sorted(Comparator.comparingInt((Integer i) -> ClipCategory.of(clipKeys.get(i))))
+                        .toList();
+                    for (Integer i : order) {
+                        actions.add(clipActions.get(i));
+                    }
+                } else {
+                    actions.addAll(clipActions);
+                }
                 BcpAdaptiveClipMenu menu = new BcpAdaptiveClipMenu(actions);
                 context.replaceContextMenu(menu);
                 // 菜单关闭时清掉预览占位框，否则会残留在原右键位置
