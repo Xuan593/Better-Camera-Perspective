@@ -32,5 +32,7 @@
   "conflict_features.config.keyframe_processing.keyframe_selection.tooltip": "新建关键帧时的选中状态：默认（原始处理设置）/ 单体（每新建一个关键帧自动解除上一个关键帧的选中状态）/ 混合（前两者的智能融合）",
   "conflict_features.config.keyframe_processing.keyframe_selection.default": "[默认]",
   "conflict_features.config.keyframe_processing.keyframe_selection.single": "[单体]",
-  "conflict_features.config.keyframe_processing.keyframe_selection.mixed": "[混合]"
+  "conflict_features.config.keyframe_processing.keyframe_selection.mixed": "[混合]",
+  "conflict_features.config.past_logs.title": "往期日志",
+  "conflict_features.config.past_logs.tooltip": "各版本更新履历（.md，最新 → 最旧）"
 }

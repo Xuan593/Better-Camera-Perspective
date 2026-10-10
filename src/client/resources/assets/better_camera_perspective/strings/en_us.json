@@ -32,5 +32,7 @@
   "conflict_features.config.keyframe_processing.keyframe_selection.tooltip": "Selection state when creating keyframes: Default (original behavior) / Single (each new keyframe deselects the previous one) / Mixed (smart fusion of both)",
   "conflict_features.config.keyframe_processing.keyframe_selection.default": "[Default]",
   "conflict_features.config.keyframe_processing.keyframe_selection.single": "[Single]",
-  "conflict_features.config.keyframe_processing.keyframe_selection.mixed": "[Mixed]"
+  "conflict_features.config.keyframe_processing.keyframe_selection.mixed": "[Mixed]",
+  "conflict_features.config.past_logs.title": "Past Logs",
+  "conflict_features.config.past_logs.tooltip": "Version history (.md, newest to oldest)"
 }

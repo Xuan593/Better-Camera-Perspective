@@ -61,6 +61,7 @@ public class BBSClientAddonEntry implements BBSAddonMod {
     public void onRegisterSettings(RegisterClientSettingsEvent event) {
         try {
             BcpModeValueUi.register();
+            BcpPastLogsModule.register();
             BcpConflictSettingsModule.register(event);
         } catch (Exception e) {
             LOGGER.error("[BCP] 设置页注册异常", e);
