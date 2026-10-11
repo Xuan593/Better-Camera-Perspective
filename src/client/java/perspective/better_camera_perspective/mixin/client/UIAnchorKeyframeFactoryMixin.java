@@ -88,7 +88,8 @@ public class UIAnchorKeyframeFactoryMixin {
         }
         return id -> {
             float tick = panel.cameraEditor.getKeyframeCursor(context == null ? 0.0F : context.getTransition()) - (float) multi.tick.get().intValue();
-            UIMultiTrackerClip.resetXyzRelative(multi, tick);
+            // v1.5.4-Alpha 四版：锚点感知归零（锚点无效时保留原值，不跳 0 0 0）
+            UIMultiTrackerClip.resetXyzRelative(multi, panel, tick);
             callback.accept(id);
         };
     }

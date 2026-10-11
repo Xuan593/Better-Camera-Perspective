@@ -67,8 +67,27 @@ public class MultiTrackerClientClip extends KeyframeClip {
      * 0 = 相对值（默认）：下一帧新建关键帧继承「相对偏移」；
      * 1 = 绝对值：下一帧新建关键帧继承「绝对坐标」。
      * 由关键帧编辑界面的「将主继承相对值 / 将主继承绝对值」按钮切换。
+     *
+     * v1.5.4-Alpha 四版：拆分为「游动 / 追踪」两路线的继承小模式，
+     * 本字段保留兼容（不再被 UI 写入）。
      */
     public int inheritMode = 0;
+
+    /**
+     * v1.5.4-Alpha 四版：「游动」路线（anchor 未绑定任何模型时自动生效）的继承小模式。
+     * 0 = 相对（默认）：XYZ 关键帧存绝对坐标，播放再叠加 offset 相对调试值（最终 = 绝对 + 调试）；
+     * 1 = 绝对：XYZ 关键帧存绝对坐标，播放直接用，offset 调试值不参与。
+     * UI 状态，不参与序列化。
+     */
+    public int roamInheritMode = 0;
+
+    /**
+     * v1.5.4-Alpha 四版：「追踪」路线（anchor 绑定模型时自动生效）的继承小模式。
+     * 0 = 相对（默认）：XYZ 关键帧存「相对锚点的偏移」，播放按「锚点 + 偏移」合成；
+     * 1 = 绝对：XYZ 关键帧存「绝对坐标」，播放直接使用（不叠加锚点）。
+     * UI 状态，不参与序列化。
+     */
+    public int trackInheritMode = 0;
 
     public MultiTrackerClientClip() {
         this.add(this.selector);
@@ -129,6 +148,8 @@ public class MultiTrackerClientClip extends KeyframeClip {
         // —— 2) 追踪求值（含过渡混合）——
         boolean tracked = false;
         double anchorX = 0.0D, anchorY = 0.0D, anchorZ = 0.0D;
+        // v1.5.4-Alpha 四版：记录追踪角度，供「关键帧空 / 无帧段」时回退（不把角度读成 0）
+        float trackYaw = 0.0F, trackPitch = 0.0F, trackRoll = 0.0F;
 
         if (!sel.isEmpty()) {
             Position current = this.track(context, position, sel, grp, lookAt);
@@ -145,6 +166,9 @@ public class MultiTrackerClientClip extends KeyframeClip {
                     anchorX = current.point.x;
                     anchorY = current.point.y;
                     anchorZ = current.point.z;
+                    trackYaw = current.angle.yaw;
+                    trackPitch = current.angle.pitch;
+                    trackRoll = current.angle.roll;
                     position.angle.yaw = this.isActive(3) ? current.angle.yaw : position.angle.yaw;
                     position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
                     position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
@@ -162,35 +186,77 @@ public class MultiTrackerClientClip extends KeyframeClip {
 
         // —— 3) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
         super.applyClip(context, position);
+        float tick = (float) context.relativeTick + context.transition;
 
-        // —— 4) 相对值语义 + 追踪生效：XYZ = 锚点 + 关键帧偏移（关键帧通道为空 = 纯追踪锚点）
+        // —— 4) 追踪路线（anchor 绑定模型）：按「追踪继承小模式」合成 XYZ ——
+        // 相对（默认）：锚点 + 关键帧偏移（通道空 / 播放头无帧段 = 纯追踪锚点）；
+        // 绝对：关键帧值即绝对坐标（空 / 无帧段回退锚点）。
+        // 角度：关键帧有值且播放头有帧段 → 保留插值；空 / 无帧段 → 回退追踪角度（不再被读成 0）。
         if (tracked && relativeMode) {
+            boolean trackAbs = this.trackInheritMode == 1;
             if (this.isActive(0)) {
-                position.point.x = this.x.isEmpty() ? anchorX : anchorX + position.point.x;
+                position.point.x = trackAbs ? safeValue(this.x, tick, anchorX) : anchorX + safeValue(this.x, tick, 0.0D);
             }
             if (this.isActive(1)) {
-                position.point.y = this.y.isEmpty() ? anchorY : anchorY + position.point.y;
+                position.point.y = trackAbs ? safeValue(this.y, tick, anchorY) : anchorY + safeValue(this.y, tick, 0.0D);
             }
             if (this.isActive(2)) {
-                position.point.z = this.z.isEmpty() ? anchorZ : anchorZ + position.point.z;
+                position.point.z = trackAbs ? safeValue(this.z, tick, anchorZ) : anchorZ + safeValue(this.z, tick, 0.0D);
+            }
+            if (this.isActive(3)) {
+                position.angle.yaw = (float) safeValue(this.yaw, tick, (double) trackYaw);
+            }
+            if (this.isActive(4)) {
+                position.angle.pitch = (float) safeValue(this.pitch, tick, (double) trackPitch);
+            }
+            if (this.isActive(5)) {
+                position.angle.roll = (float) safeValue(this.roll, tick, (double) trackRoll);
             }
         }
 
-        // —— 5) 无追踪目标（anchor 无关键帧 / 未绑定模型）：XYZ 以绝对值为准 ——
-        // 通道非空：关键帧值即绝对坐标（继承逻辑保证），再叠加 offset 作为相对调试值（最终 = 绝对 + 调试）；
-        // 通道为空：回退进入本剪辑前的相机位置——删除全部关键帧后不再飞回 0 0 0。
+        // —— 5) 游动路线（anchor 未绑定模型）：XYZ 以绝对值为准 ——
+        // 通道有值且播放头有帧段：关键帧值即绝对坐标；空 / 无帧段：回退进入本剪辑前的相机位置（不再飞回 0 0 0）。
+        // 相对（默认）：再叠加 offset 相对调试值（最终 = 绝对 + 调试）；绝对：offset 不参与。
+        // 角度：有值且播放头有帧段 → 保留插值；空 / 无帧段 → 回退进入前角度（不再被读成 0 / 平视跳变）。
         if (!tracked && relativeMode) {
+            boolean roamAbs = this.roamInheritMode == 1;
             Point debug = this.offset.get();
             if (this.isActive(0)) {
-                position.point.x = this.x.isEmpty() ? basePosition.point.x : position.point.x + debug.x;
+                double v = safeValue(this.x, tick, basePosition.point.x);
+                position.point.x = roamAbs ? v : v + debug.x;
             }
             if (this.isActive(1)) {
-                position.point.y = this.y.isEmpty() ? basePosition.point.y : position.point.y + debug.y;
+                double v = safeValue(this.y, tick, basePosition.point.y);
+                position.point.y = roamAbs ? v : v + debug.y;
             }
             if (this.isActive(2)) {
-                position.point.z = this.z.isEmpty() ? basePosition.point.z : position.point.z + debug.z;
+                double v = safeValue(this.z, tick, basePosition.point.z);
+                position.point.z = roamAbs ? v : v + debug.z;
+            }
+            if (this.isActive(3)) {
+                position.angle.yaw = (float) safeValue(this.yaw, tick, (double) basePosition.angle.yaw);
+            }
+            if (this.isActive(4)) {
+                position.angle.pitch = (float) safeValue(this.pitch, tick, (double) basePosition.angle.pitch);
+            }
+            if (this.isActive(5)) {
+                position.angle.roll = (float) safeValue(this.roll, tick, (double) basePosition.angle.roll);
             }
         }
+
+        // —— 6) 视野：空 / 播放头无帧段回退进入前值（两条路线一致，不再被读成 0）——
+        if (this.isActive(6)) {
+            position.angle.fov = (float) safeValue(this.fov, tick, (double) basePosition.angle.fov);
+        }
+    }
+
+    /**
+     * v1.5.4-Alpha 四版：安全读取关键帧通道在当前 tick 的值。
+     * 通道为空、或播放头不在任何关键帧段（此时 interpolate 会返回 0）时返回 fallback，
+     * 否则返回插值——杜绝「空通道 / 无帧段被读成 0，相机与角度飞回原点」的跳变。
+     */
+    private static double safeValue(KeyframeChannel<Double> channel, float tick, double fallback) {
+        return channel.isEmpty() || channel.findSegment(tick) == null ? fallback : channel.interpolate(tick);
     }
 
     /** 追踪求值：返回按 active 位过滤后的 Position 副本；目标实体或帧无效时返回 null。 */

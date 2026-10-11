@@ -4,9 +4,12 @@ import mchorse.bbs_mod.BBSSettings;
 import mchorse.bbs_mod.ui.film.IUIClipsDelegate;
 import mchorse.bbs_mod.ui.film.UIFilmPanel;
 import mchorse.bbs_mod.ui.film.utils.keyframes.UIFilmKeyframes;
+import mchorse.bbs_mod.ui.framework.UIContext;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframes;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
+import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.KeyframeType;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.graphs.UIKeyframeDopeSheet;
+import mchorse.bbs_mod.utils.Pair;
 import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
@@ -51,12 +54,52 @@ public class UIKeyframeDopeSheetMixin {
         return null;
     }
 
+    @Shadow
+    public void clearSelection() {
+    }
+
+    @Shadow
+    public Pair<Keyframe, KeyframeType> findKeyframe(int mouseX, int mouseY) {
+        return null;
+    }
+
     /**
      * v1.5-Alpha：混合模式下记录「每个通道上次新建的关键帧索引」，
      * 新建时只解除该帧的选中（保留手动选中的帧），实现前两者的智能融合。
      */
     @Unique
     private final Map<UIKeyframeSheet, Integer> bcp$lastCreatedIndexes = new HashMap<>();
+
+    /**
+     * v1.5.4-Alpha 四版：左键点击「已选中关键帧所在轨道」的空白处 → 取消选中（不打点）。
+     *
+     * 背景：原版 BBS 的「点击空白取消选中」仅存在于 UIKeyframes.subMouseClicked 的
+     * pickOrStartSelectingKeyframes（需点击 graph 纯空白且 DopeSheet 返回 false）；
+     * 而点击轨道行内空白会走 clickSheets → addKeyframeManually 新建关键帧，且该路径
+     * 不经 addKeyframeAt（BCP 的选中三模式注入也不生效），新建帧直接进入选中态——
+     * 用户在轨道空白点击只会不断打点 / 保持选中，无法取消。
+     *
+     * 本注入：命中「轨道行内、非关键帧」且该轨道已有选中帧时，取消全部选中并拦截
+     * （clearSelection 内部会 pickKeyframe(null) 同步关闭值面板）；否则放行原逻辑
+     * （无选中的轨道空白 → 原版打点；graph 纯空白 → 上层 pickOrStartSelectingKeyframes 清空）。
+     */
+    @Inject(method = "mouseClicked", at = @At("HEAD"), cancellable = true)
+    private void bcp$mouseClicked(UIContext context, CallbackInfoReturnable<Boolean> cir) {
+        if (context.mouseButton != 0) {
+            return;
+        }
+        if (!this.keyframes.area.isInside(context) || context.mouseX <= this.keyframes.area.x + this.keyframes.getLabelWidth()) {
+            return;
+        }
+        if (this.findKeyframe(context.mouseX, context.mouseY) != null) {
+            return;
+        }
+        UIKeyframeSheet sheet = this.getSheet(context.mouseY);
+        if (sheet != null && sheet.selection.hasAny()) {
+            this.clearSelection();
+            cir.setReturnValue(true);
+        }
+    }
 
     @Inject(method = "addKeyframeAt", at = @At("HEAD"), cancellable = true)
     private void bcp$addKeyframeAt(float tick, int mouseY, CallbackInfoReturnable<Boolean> cir) {

@@ -32,6 +32,7 @@ import mchorse.bbs_mod.utils.joml.Matrices;
 import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
+import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
@@ -104,9 +105,10 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                         this.getContext(), panel.getController().getEntities(), this.clip.selector.get(),
                         // v1.4.1：选中锚点目标后自动归零当前帧 XYZ 相对值（摄像机贴回锚点，避免旧相对偏移把相机甩远）
                         // v1.5.4-Alpha：只归零当前播放头处，不再破坏其他帧的关键帧值
+                        // v1.5.4-Alpha 四版：锚点感知归零——锚点无效时保留原值（不跳 0 0 0）
                         i -> {
                             this.clip.selector.set(i);
-                            resetXyzRelative(this.clip, this.cursorTick());
+                            resetXyzRelative(this.clip, panel, this.cursorTick());
                         }
                     );
                 }
@@ -118,9 +120,10 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
             b -> UIAnchorKeyframeFactory.displayAttachments(
                 this.getParent(UIFilmPanel.class), this.clip.selector.get(), this.clip.group.get(),
                 // v1.4.1：切换绑定部位后同样归零当前帧 XYZ 相对值
+                // v1.5.4-Alpha 四版：锚点感知归零
                 attachment -> {
                     this.clip.group.set(attachment);
-                    resetXyzRelative(this.clip, this.cursorTick());
+                    resetXyzRelative(this.clip, this.getParent(UIFilmPanel.class), this.cursorTick());
                 }
             )
         );
@@ -299,6 +302,12 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.keyframes.setClip(this.clip);
         // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
         this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
+        // v1.5.4-Alpha 四版：新建剪辑默认在 tick 0 放一个「空 anchor 关键帧」（未绑定任何模型）。
+        // 作为「游动 / 追踪」两条路线的分派锚点：anchor 无绑定 → 游动路线自动生效；
+        // 有绑定目标 → 追踪路线自动生效（游动的两值与追踪的两值互不串用）。
+        if (this.clip.anchor.isEmpty()) {
+            this.clip.anchor.insert(0, KeyframeFactories.ANCHOR.createEmpty());
+        }
         // v1.1：给 X / Y / Z 通道设置 seed —— 新建关键帧（无插值段可继承）时按「主继承模式」供给继承值。
         // v1.4.1：扩展覆盖 偏航/俯仰/横滚/视野（无关键帧新建帧不再默认 0，继承摄像机默认视角）。
         for (UIKeyframeSheet sheet : this.keyframes.view.getGraph().getSheets()) {
@@ -346,11 +355,22 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         return panel == null ? 0.0D : defaultInheritValue(this.clip, panel, axis, tick);
     }
 
-    /** v1.4.1：无关键帧时各轴的默认继承值（摄像机当前视角换算）。 */
+    /**
+     * v1.4.1：无关键帧时各轴的默认继承值（摄像机当前视角换算）。
+     * v1.5.4-Alpha 四版：XYZ 按「游动 / 追踪」路线区分——
+     *   追踪路线（anchor 绑定模型）：相对 = 相机 − 锚点；绝对 = 相机（存绝对坐标，播放直接用）；
+     *   游动路线（anchor 未绑定）：两小模式同存绝对坐标。
+     */
     public static double defaultInheritValue(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
         if (axis <= 2) {
-            // X / Y / Z：摄像机位置 − 追踪锚点 = 相对偏移
-            return cameraAxisAt(panel, axis) - anchorAxisAt(clip, panel, axis, tick);
+            // X / Y / Z：按当前路线决定继承值
+            double camera = cameraAxisAt(panel, axis);
+            if (isTracked(clip, panel, tick)) {
+                // 追踪路线：相对 = 相机 − 锚点（偏移）；绝对 = 相机（绝对坐标）
+                return clip.trackInheritMode == 1 ? camera : camera - anchorAxisAt(clip, panel, axis, tick);
+            }
+            // 游动路线：绝对坐标（相对 / 绝对小模式同值，播放时靠 offset 调试值区分）
+            return camera;
         }
         CameraController controller = panel.getCameraController();
         if (axis == 3) {
@@ -428,24 +448,63 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
      * v1.5.4-Alpha：不再破坏其他帧的关键帧值；且**绝不插入新帧**——
      * 当前 tick 处没有关键帧（如新建剪辑 XYZ 通道为空）时保持原状，
      * 避免「锁 0」现象（插入 0 值帧会覆盖默认继承值，摄像机被读回 XYZ=0 区域）。
+     * v1.5.4-Alpha 四版：改为「锚点感知归零」——仅当当前帧有有效的追踪锚点时，
+     * 把该帧值写为「相机位置 − 锚点」（贴回锚点，偏移为 0）；
+     * 锚点无效（模型缺失 / 部位解析失败）时**保留原值**，不再把帧写成 0
+     * （否则无锚点游动时该 0 值帧被当作绝对坐标 0,0,0，摄像机仍会飞回原点）。
      */
-    public static void resetXyzRelative(MultiTrackerClientClip clip, float tick) {
+    public static void resetXyzRelative(MultiTrackerClientClip clip, UIFilmPanel panel, float tick) {
         if (clip == null) {
             return;
         }
-        resetChannel(clip.x, tick);
-        resetChannel(clip.y, tick);
-        resetChannel(clip.z, tick);
+        resetChannel(clip.x, clip, panel, 0, tick);
+        resetChannel(clip.y, clip, panel, 1, tick);
+        resetChannel(clip.z, clip, panel, 2, tick);
     }
 
-    /** v1.5.4-Alpha：仅当 tick 处已有关键帧时才归零该帧，绝不新增关键帧。 */
-    private static void resetChannel(KeyframeChannel<Double> channel, float tick) {
+    /** v1.5.4-Alpha 四版：仅当 tick 处已有关键帧且追踪锚点有效时才「贴回锚点」，绝不新增关键帧。 */
+    private static void resetChannel(KeyframeChannel<Double> channel, MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
         for (Keyframe keyframe : channel.getKeyframes()) {
             if (keyframe.getTick() == tick) {
-                keyframe.setValue(0.0D);
+                if (isTracked(clip, panel, tick)) {
+                    // 追踪锚点有效：相机贴回锚点（相对偏移归零）
+                    keyframe.setValue(cameraAxisAt(panel, axis) - anchorAxisAt(clip, panel, axis, tick));
+                }
+                // 锚点无效：保留原值（游动语义，不跳 0）
                 return;
             }
         }
+    }
+
+    /**
+     * v1.5.4-Alpha 四版：判断当前播放头处是否处于「追踪」路线（anchor 绑定模型且锚点可解析）。
+     * 追踪目标按 anchor 轴在该 tick 的插值优先，回退剪辑属性 selector/group；
+     * 无追踪目标（未绑定 / 模型缺失 / 部位解析失败）→ 游动路线。
+     */
+    public static boolean isTracked(MultiTrackerClientClip clip, UIFilmPanel panel, float tick) {
+        if (clip == null || panel == null) {
+            return false;
+        }
+        String sel = clip.selector.get();
+        String grp = clip.group.get();
+        if (!clip.anchor.isEmpty()) {
+            Anchor anchor = clip.anchor.interpolate(tick);
+            if (anchor == null || !anchor.hasTarget()) {
+                anchor = nearestAnchorAtOrBefore(clip.anchor, tick);
+            }
+            if (anchor != null && anchor.hasTarget()) {
+                sel = anchor.replay;
+                grp = anchor.attachment;
+            }
+        }
+        if (sel.isEmpty()) {
+            return false;
+        }
+        IEntity actor = panel.getController().getEntities().get(sel);
+        if (actor == null) {
+            return false;
+        }
+        return anchorPos(clip, panel, actor, grp, tick) != null;
     }
 
     /** v1.5.4-Alpha：当前播放头在剪辑内的 tick（与 insertKeyframes 口径一致）。 */

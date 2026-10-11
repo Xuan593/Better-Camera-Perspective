@@ -17,18 +17,21 @@ import net.fabricmc.api.Environment;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
 
 /**
- * XYZ 关键帧值双值联动编辑工厂（v1.0 / v1.1）。
+ * XYZ 关键帧值双值联动编辑工厂（v1.0 / v1.1 / v1.5.4-Alpha 四版）。
  *
  * 选中多样追踪剪辑的 X / Y / Z 关键帧时，同时显示两个数值：
  *  - 相对值：该视角相对于被绑定模型及部位（或默认位置）的相对偏移 —— 直接写入关键帧；
  *  - 绝对值：该视角在地图上的绝对坐标。
  * 两个值任改其一，另一个值按「该 tick 的追踪锚点」自动同步换算（绝对 = 相对 + 锚点）。
  *
- * v1.1：两个行首的锁定标签升级为「主继承模式」开关：
- *  - 默认激活「相对值」——点击后按钮文本变为「将主继承相对值」，表示后续新建关键帧主继承相对值；
- *  - 点击「绝对值」按钮同理（「将主继承绝对值」）；
- *  - 主继承模式存储在剪辑实例 {@link MultiTrackerClientClip#inheritMode}，
- *    新建关键帧时（多样追踪 X/Y/Z 通道）按该模式供给继承值。
+ * v1.1：两个行首的锁定标签升级为「主继承模式」开关。
+ * v1.5.4-Alpha 四版：主继承模式拆分为「游动 / 追踪」两条路线（anchor 是否绑定模型自动路由）：
+ *  - 游动路线（anchor 未绑定）：相对 = XYZ 关键帧存绝对坐标 + offset 调试值参与播放；
+ *    绝对 = 关键帧即绝对坐标，offset 不参与；
+ *  - 追踪路线（anchor 绑定）：相对 = 关键帧存「锚点相对偏移」，播放按「锚点 + 偏移」合成；
+ *    绝对 = 关键帧存「绝对坐标」，播放直接使用（不叠加锚点）。
+ * 按钮文本随当前路线切换（游动·相对 / 游动·绝对 / 追踪·相对 / 追踪·绝对），
+ * 选中（高亮）即应用，分别写入 {@link MultiTrackerClientClip#roamInheritMode} / {@link MultiTrackerClientClip#trackInheritMode}。
  */
 @Environment(EnvType.CLIENT)
 public class UIXyzKeyframeFactory extends UIKeyframeFactory<Double> {
@@ -65,30 +68,44 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<Double> {
         return button;
     }
 
-    /** 切换主继承模式：0 = 相对值，1 = 绝对值。 */
+    /** v1.5.4-Alpha 四版：切换主继承模式（按当前路线写入对应字段）。 */
     private void setMode(int mode) {
         MultiTrackerClientClip clip = this.findClip();
         if (clip != null) {
-            clip.inheritMode = mode;
+            if (this.isTracked()) {
+                clip.trackInheritMode = mode;
+            } else {
+                clip.roamInheritMode = mode;
+            }
         }
         this.refreshButtons();
     }
 
-    /** 刷新两个模式按钮的文本与高亮状态（激活 = 长文本 + 主色底；未激活 = 短标签）。 */
+    /** v1.5.4-Alpha 四版：当前帧是否处于「追踪」路线（anchor 绑定模型且锚点可解析）。 */
+    private boolean isTracked() {
+        MultiTrackerClientClip clip = this.findClip();
+        UIFilmPanel panel = this.getPanel();
+        if (clip == null || panel == null) {
+            return false;
+        }
+        return UIMultiTrackerClip.isTracked(clip, panel, this.keyframe.getTick());
+    }
+
+    /** 刷新两个模式按钮的文本与高亮状态（激活 = 主色底；未激活 = 灰字）。 */
     private void refreshButtons() {
         MultiTrackerClientClip clip = this.findClip();
-        boolean relative = clip == null || clip.inheritMode == 0;
+        boolean tracked = this.isTracked();
+        boolean relative = clip == null ? true : (tracked ? clip.trackInheritMode == 0 : clip.roamInheritMode == 0);
 
-        this.relativeButton.label = IKey.raw(
-            relative
-                ? L10n.lang("bbs.ui.camera.panels.xyz.inherit_relative").get()
-                : L10n.lang("bbs.ui.camera.panels.xyz.relative").get()
-        );
-        this.absoluteButton.label = IKey.raw(
-            relative
-                ? L10n.lang("bbs.ui.camera.panels.xyz.absolute").get()
-                : L10n.lang("bbs.ui.camera.panels.xyz.inherit_absolute").get()
-        );
+        String relText = L10n.lang(
+            tracked ? "bbs.ui.camera.panels.xyz.track_relative" : "bbs.ui.camera.panels.xyz.roam_relative"
+        ).get();
+        String absText = L10n.lang(
+            tracked ? "bbs.ui.camera.panels.xyz.track_absolute" : "bbs.ui.camera.panels.xyz.roam_absolute"
+        ).get();
+
+        this.relativeButton.label = IKey.raw(relText);
+        this.absoluteButton.label = IKey.raw(absText);
 
         int primary = BBSSettings.primaryColor(0) | 0xFF000000;
         if (relative) {
@@ -133,6 +150,7 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<Double> {
     @Override
     public void update() {
         super.update();
+        this.refreshButtons();
         this.updateValues();
     }
 
