@@ -24,6 +24,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
+import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 /**
  * 多样追踪（MultiTracker）——客户端剪辑类。
@@ -146,15 +147,20 @@ public class MultiTrackerClientClip extends KeyframeClip {
         }
 
         // —— 2) 追踪求值（含过渡混合）——
+        // 路线由 anchor 关键帧值判定（<无> = 游动；绑定模型 / 伪装 = 追踪；anchor 无关键帧回落剪辑属性）。
+        float tick = (float) context.relativeTick + context.transition;
+        boolean trackRoute = UIMultiTrackerClip.hasTrackTarget(this, tick);
         boolean tracked = false;
+        boolean trackResolved = false;
         double anchorX = 0.0D, anchorY = 0.0D, anchorZ = 0.0D;
         // v1.5.4-Alpha 四版：记录追踪角度，供「关键帧空 / 无帧段」时回退（不把角度读成 0）
         float trackYaw = 0.0F, trackPitch = 0.0F, trackRoll = 0.0F;
 
-        if (!sel.isEmpty()) {
+        if (trackRoute && !sel.isEmpty()) {
             Position current = this.track(context, position, sel, grp, lookAt);
+            tracked = true;
             if (current != null) {
-                tracked = true;
+                trackResolved = true;
                 if (blendSource && blend < 1.0F) {
                     Position from = fromSel == null || fromSel.isEmpty() ? null : this.track(context, position, fromSel, fromGrp, lookAt);
                     Position base = from != null ? from : position.copy();
@@ -181,27 +187,39 @@ public class MultiTrackerClientClip extends KeyframeClip {
                     position.angle.pitch = this.isActive(4) ? current.angle.pitch : position.angle.pitch;
                     position.angle.roll = this.isActive(5) ? current.angle.roll : position.angle.roll;
                 }
+            } else {
+                // 追踪目标解析失败（如绑定的伪装未实例化进影片）：锚点视为 0（关键帧值即绝对坐标），
+                // 角度回退进入前值 —— 不把角度读成 0 / 平视跳变。
+                trackYaw = basePosition.angle.yaw;
+                trackPitch = basePosition.angle.pitch;
+                trackRoll = basePosition.angle.roll;
             }
         }
 
         // —— 3) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
         super.applyClip(context, position);
-        float tick = (float) context.relativeTick + context.transition;
 
         // —— 4) 追踪路线（anchor 绑定模型）：按「追踪继承小模式」合成 XYZ ——
         // 相对（默认）：锚点 + 关键帧偏移（通道空 / 播放头无帧段 = 纯追踪锚点）；
         // 绝对：关键帧值即绝对坐标（空 / 无帧段回退锚点）。
         // 角度：关键帧有值且播放头有帧段 → 保留插值；空 / 无帧段 → 回退追踪角度（不再被读成 0）。
+        // 追踪未解析（trackResolved=false）：锚点 0，空通道 / 无帧段回退进入前位置（不飞 0 0 0）。
         if (tracked && relativeMode) {
             boolean trackAbs = this.trackInheritMode == 1;
             if (this.isActive(0)) {
-                position.point.x = trackAbs ? safeValue(this.x, tick, anchorX) : anchorX + safeValue(this.x, tick, 0.0D);
+                position.point.x = trackAbs
+                    ? safeValue(this.x, tick, trackResolved ? anchorX : basePosition.point.x)
+                    : anchorX + safeValue(this.x, tick, trackResolved ? 0.0D : basePosition.point.x);
             }
             if (this.isActive(1)) {
-                position.point.y = trackAbs ? safeValue(this.y, tick, anchorY) : anchorY + safeValue(this.y, tick, 0.0D);
+                position.point.y = trackAbs
+                    ? safeValue(this.y, tick, trackResolved ? anchorY : basePosition.point.y)
+                    : anchorY + safeValue(this.y, tick, trackResolved ? 0.0D : basePosition.point.y);
             }
             if (this.isActive(2)) {
-                position.point.z = trackAbs ? safeValue(this.z, tick, anchorZ) : anchorZ + safeValue(this.z, tick, 0.0D);
+                position.point.z = trackAbs
+                    ? safeValue(this.z, tick, trackResolved ? anchorZ : basePosition.point.z)
+                    : anchorZ + safeValue(this.z, tick, trackResolved ? 0.0D : basePosition.point.z);
             }
             if (this.isActive(3)) {
                 position.angle.yaw = (float) safeValue(this.yaw, tick, (double) trackYaw);

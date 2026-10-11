@@ -477,34 +477,43 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     }
 
     /**
-     * v1.5.4-Alpha 四版：判断当前播放头处是否处于「追踪」路线（anchor 绑定模型且锚点可解析）。
-     * 追踪目标按 anchor 轴在该 tick 的插值优先，回退剪辑属性 selector/group；
-     * 无追踪目标（未绑定 / 模型缺失 / 部位解析失败）→ 游动路线。
+     * v1.5.4-Alpha 四版修订：判断当前播放头处处于「游动」还是「追踪」路线。
+     * 用户口径：路线只看 **anchor 关键帧值** —— 值为 <无> → 游动；值绑定模型 / 伪装 → 追踪；
+     * anchor 关键帧无论绑定伪装还是 <无> 都能进行视角动画。
+     * （不依赖实体能否解析：绑定的伪装不在影片实体列表时依然按「追踪」显示与路由。）
      */
     public static boolean isTracked(MultiTrackerClientClip clip, UIFilmPanel panel, float tick) {
-        if (clip == null || panel == null) {
+        return hasTrackTarget(clip, tick);
+    }
+
+    /**
+     * v1.5.4-Alpha 四版修订：路线判定核心 —— 只看 anchor 关键帧值。
+     *  - anchor 通道有关键帧：取该 tick 关键帧值（interpolate 优先，无帧段回退最近 ≤tick 的关键帧），
+     *    值非空且 hasTarget → 追踪；值 <无> → 游动；
+     *  - anchor 通道完全无关键帧（老存档 / 手动删光）：回落剪辑属性「目标」绑定（保持 v0.1 行为）。
+     */
+    public static boolean hasTrackTarget(MultiTrackerClientClip clip, float tick) {
+        if (clip == null) {
             return false;
         }
-        String sel = clip.selector.get();
-        String grp = clip.group.get();
-        if (!clip.anchor.isEmpty()) {
-            Anchor anchor = clip.anchor.interpolate(tick);
-            if (anchor == null || !anchor.hasTarget()) {
-                anchor = nearestAnchorAtOrBefore(clip.anchor, tick);
+        KeyframeChannel<Anchor> channel = clip.anchor;
+        if (channel.isEmpty()) {
+            String sel = clip.selector.get();
+            return sel != null && !sel.isEmpty();
+        }
+        Anchor anchor = channel.interpolate(tick);
+        if (anchor == null) {
+            Anchor best = null;
+            float bestTick = -1.0F;
+            for (Keyframe keyframe : channel.getKeyframes()) {
+                if (keyframe.getTick() <= tick && keyframe.getTick() >= bestTick) {
+                    best = (Anchor) keyframe.getValue();
+                    bestTick = keyframe.getTick();
+                }
             }
-            if (anchor != null && anchor.hasTarget()) {
-                sel = anchor.replay;
-                grp = anchor.attachment;
-            }
+            anchor = best;
         }
-        if (sel.isEmpty()) {
-            return false;
-        }
-        IEntity actor = panel.getController().getEntities().get(sel);
-        if (actor == null) {
-            return false;
-        }
-        return anchorPos(clip, panel, actor, grp, tick) != null;
+        return anchor != null && anchor.hasTarget();
     }
 
     /** v1.5.4-Alpha：当前播放头在剪辑内的 tick（与 insertKeyframes 口径一致）。 */
