@@ -87,6 +87,8 @@ public class MultiTrackerClientClip extends KeyframeClip {
         boolean lookAt = this.lookAt.get();
         // v1.0：XYZ 关键帧固定为「相对值」语义（锚点 + 关键帧偏移合成；lookAt / 叠加除外）
         boolean relativeMode = !additive && !lookAt;
+        // v1.5.4-Alpha 二版：进入本剪辑前的相机位置快照，供无锚点空通道回退（不飞回 0 0 0）
+        Position basePosition = position.copy();
 
         // —— 1) 追踪目标解析（anchor 轴优先，v0.3）——
         String sel = this.selector.get();
@@ -171,6 +173,22 @@ public class MultiTrackerClientClip extends KeyframeClip {
             }
             if (this.isActive(2)) {
                 position.point.z = this.z.isEmpty() ? anchorZ : anchorZ + position.point.z;
+            }
+        }
+
+        // —— 5) 无追踪目标（anchor 无关键帧 / 未绑定模型）：XYZ 以绝对值为准 ——
+        // 通道非空：关键帧值即绝对坐标（继承逻辑保证），再叠加 offset 作为相对调试值（最终 = 绝对 + 调试）；
+        // 通道为空：回退进入本剪辑前的相机位置——删除全部关键帧后不再飞回 0 0 0。
+        if (!tracked && relativeMode) {
+            Point debug = this.offset.get();
+            if (this.isActive(0)) {
+                position.point.x = this.x.isEmpty() ? basePosition.point.x : position.point.x + debug.x;
+            }
+            if (this.isActive(1)) {
+                position.point.y = this.y.isEmpty() ? basePosition.point.y : position.point.y + debug.y;
+            }
+            if (this.isActive(2)) {
+                position.point.z = this.z.isEmpty() ? basePosition.point.z : position.point.z + debug.z;
             }
         }
     }
