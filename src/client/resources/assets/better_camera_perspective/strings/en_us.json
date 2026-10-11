@@ -6,6 +6,8 @@
   "bbs.ui.camera.panels.xyz.inherit_relative": "Inherit relative",
   "bbs.ui.camera.panels.xyz.inherit_absolute": "Inherit absolute",
   "bbs.ui.camera.panels.xyz.inherit_tooltip": "Click to set the primary inherit mode: newly created keyframes will inherit the value of this mode",
+  "bbs.ui.camera.panels.xyz.angle_debug": "Debug (-360~+360)",
+  "bbs.ui.camera.panels.xyz.angle_formal": "Formal (unlimited)",
   "bbs.ui.camera.panels.anchor_uncategorized": "Uncategorized",
   "bbs.ui.camera.panels.back": "Back",
   "bbs.ui.camera.panel.columns": "Columns: %s",

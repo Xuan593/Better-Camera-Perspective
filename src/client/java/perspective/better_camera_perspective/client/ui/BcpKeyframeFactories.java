@@ -27,6 +27,10 @@ public class BcpKeyframeFactories {
         PROPERTIES.put("x", (kf, ed) -> new UIXyzKeyframeFactory(kf, ed, 0));
         PROPERTIES.put("y", (kf, ed) -> new UIXyzKeyframeFactory(kf, ed, 1));
         PROPERTIES.put("z", (kf, ed) -> new UIXyzKeyframeFactory(kf, ed, 2));
+        // 角度关键帧值面板：调试（-360~+360）+ 正式（不限）双值联动编辑
+        PROPERTIES.put("yaw", (kf, ed) -> new UIAngleKeyframeFactory(kf, ed));
+        PROPERTIES.put("pitch", (kf, ed) -> new UIAngleKeyframeFactory(kf, ed));
+        PROPERTIES.put("roll", (kf, ed) -> new UIAngleKeyframeFactory(kf, ed));
     }
 
     public static UIKeyframeFactory.IUIKeyframeFactoryFactory get(String name) {
