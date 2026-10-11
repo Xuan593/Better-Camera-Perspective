@@ -65,12 +65,16 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<Double> {
         this.axis = axis;
 
         this.roamRelativeValue = new UITrackpad(this::setRoamRelative);
+        this.roamRelativeValue.h(20);
         this.roamRelativeValue.tooltip(L10n.lang("bbs.ui.camera.panels.xyz.relative"));
         this.roamAbsoluteValue = new UITrackpad(this::setRoamAbsolute);
+        this.roamAbsoluteValue.h(20);
         this.roamAbsoluteValue.tooltip(L10n.lang("bbs.ui.camera.panels.xyz.absolute"));
         this.trackRelativeValue = new UITrackpad(this::setTrackRelative);
+        this.trackRelativeValue.h(20);
         this.trackRelativeValue.tooltip(L10n.lang("bbs.ui.camera.panels.xyz.relative"));
         this.trackAbsoluteValue = new UITrackpad(this::setTrackAbsolute);
+        this.trackAbsoluteValue.h(20);
         this.trackAbsoluteValue.tooltip(L10n.lang("bbs.ui.camera.panels.xyz.absolute"));
 
         this.roamRelativeButton = this.modeButton(b -> this.setRoamMode(0));
@@ -80,12 +84,14 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<Double> {
 
         // 组1 · 游动
         UILabel roamTitle = new UILabel(IKey.raw("游动"), COLOR_ROAM);
+        roamTitle.relative(this.scroll).w(1.0F).h(20);
         this.scroll.add(roamTitle);
         this.scroll.add(UI.row(2, 0, 0, this.roamRelativeButton, this.roamRelativeValue));
         this.scroll.add(UI.row(2, 0, 0, this.roamAbsoluteButton, this.roamAbsoluteValue));
 
         // 组2 · 追踪
         UILabel trackTitle = new UILabel(IKey.raw("追踪"), COLOR_TRACK);
+        trackTitle.relative(this.scroll).w(1.0F).h(20);
         this.scroll.add(trackTitle);
         this.scroll.add(UI.row(2, 0, 0, this.trackRelativeButton, this.trackRelativeValue));
         this.scroll.add(UI.row(2, 0, 0, this.trackAbsoluteButton, this.trackAbsoluteValue));
