@@ -24,6 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import perspective.better_camera_perspective.client.BcpKeyframeProcessing;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
+import perspective.better_camera_perspective.client.data.XyzFrameData;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 import java.util.HashMap;
@@ -160,7 +161,10 @@ public class UIKeyframeDopeSheetMixin {
         cir.setReturnValue(true);
     }
 
-    /** 多样追踪 X/Y/Z/偏航/俯仰/横滚/视野 通道 → 主继承值；其余返回 null（保持 BBS 原逻辑）。 */
+    /**
+     * 多样追踪帧级位置通道（xd / yd / zd）→ XyzFrameData；
+     * 角度 / 视野通道（yaw / pitch / roll / fov）→ Double；其余返回 null（保持 BBS 原逻辑）。
+     */
     private Object bcp$inheritValue(UIKeyframeSheet sheet, float tick) {
         if (!(this.keyframes instanceof UIFilmKeyframes film) || film.editor == null) {
             return null;
@@ -171,14 +175,22 @@ public class UIKeyframeDopeSheetMixin {
             return null;
         }
 
+        UIFilmPanel panel = this.keyframes.getParent(UIFilmPanel.class);
+
+        // 帧级位置通道
+        if (sheet.channel == multi.xd) {
+            return this.frameInheritValue(multi, panel, 0, tick);
+        }
+        if (sheet.channel == multi.yd) {
+            return this.frameInheritValue(multi, panel, 1, tick);
+        }
+        if (sheet.channel == multi.zd) {
+            return this.frameInheritValue(multi, panel, 2, tick);
+        }
+
+        // 角度 / 视野
         int axis;
-        if (sheet.channel == multi.x) {
-            axis = 0;
-        } else if (sheet.channel == multi.y) {
-            axis = 1;
-        } else if (sheet.channel == multi.z) {
-            axis = 2;
-        } else if (sheet.channel == multi.yaw) {
+        if (sheet.channel == multi.yaw) {
             axis = 3;
         } else if (sheet.channel == multi.pitch) {
             axis = 4;
@@ -191,18 +203,30 @@ public class UIKeyframeDopeSheetMixin {
         }
 
         KeyframeChannel<Double> channel = (KeyframeChannel<Double>) sheet.channel;
-        double value;
-        if (channel.isEmpty()) {
-            // v1.4.1：删除所有帧后新建关键帧 → 继承摄像机的默认视角，不跳变
-            UIFilmPanel panel = this.keyframes.getParent(UIFilmPanel.class);
-            value = panel == null
-                ? 0.0D
-                : UIMultiTrackerClip.defaultInheritValue(multi, panel, axis, tick);
-        } else {
-            value = channel.interpolate(tick);
+        if (!channel.isEmpty()) {
+            return channel.interpolate(tick);
         }
-        // v1.4.1：X/Y/Z 通道值恒为「相对偏移」——相对模式显示相对值；
-        // 绝对模式显示 = 相对 + 锚点 = 摄像机位置（两模式同值，修正 v1.1 绝对模式双倍锚点问题）
-        return value;
+        // 空通道：继承摄像机默认视角（不跳 0）
+        return panel == null ? 0.0D : UIMultiTrackerClip.defaultInheritValue(multi, panel, axis, tick);
+    }
+
+    /**
+     * 帧级通道打点值：通道有帧段取插值 XyzFrameData；
+     * 空通道用当前摄像机视角构造（roamValue = camera；trackRelative = camera − anchor；trackAbsolute = camera）。
+     */
+    private XyzFrameData frameInheritValue(MultiTrackerClientClip multi, UIFilmPanel panel, int axis, float tick) {
+        KeyframeChannel<XyzFrameData> channel = axis == 0 ? multi.xd : axis == 1 ? multi.yd : multi.zd;
+        if (!channel.isEmpty() && channel.findSegment(tick) != null) {
+            return channel.interpolate(tick);
+        }
+        double camera = UIMultiTrackerClip.cameraAxisAt(panel, axis);
+        double anchor = UIMultiTrackerClip.hasTrackTarget(multi, tick) && panel != null
+            ? UIMultiTrackerClip.anchorAxisAt(multi, panel, axis, tick)
+            : camera;
+        XyzFrameData data = new XyzFrameData();
+        data.roamValue = camera;
+        data.trackRelative = camera - anchor;
+        data.trackAbsolute = camera;
+        return data;
     }
 }

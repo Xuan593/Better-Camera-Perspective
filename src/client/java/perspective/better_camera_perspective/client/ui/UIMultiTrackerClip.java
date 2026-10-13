@@ -38,6 +38,10 @@ import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
+import perspective.better_camera_perspective.client.data.XyzFrameData;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * 多样追踪（MultiTracker）——剪辑 UI 面板。
@@ -256,25 +260,48 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 }
             }
 
-            // 多样追踪（v1.0）：XYZ 关键帧固定「相对值」语义——存相对锚点的偏移
-            //（「偏移栏」语义，播放时按「锚点 + 关键帧偏移」合成）。
-            double ax = 0.0D, ay = 0.0D, az = 0.0D;
-            if (!this.clip.lookAt.get() && this.isActive(0, 1, 2)) {
-                TrackerFrame anchorFrame = this.resolveFrame(position);
-                if (anchorFrame != null) {
-                    Vector3d anchor = anchorFrame.position(this.clip.offset.get());
-                    ax = this.clip.isActive(0) ? anchor.x : 0.0D;
-                    ay = this.clip.isActive(1) ? anchor.y : 0.0D;
-                    az = this.clip.isActive(2) ? anchor.z : 0.0D;
-                }
+            if (this.clip.lookAt.get()) {
+                // lookAt：XYZ 写父类 Double 通道（绝对坐标，旧行为；播放时被追踪锚点覆盖）
+                this.insertKeyframe(tick, this.clip.x, newPos.point.x);
+                this.insertKeyframe(tick, this.clip.y, newPos.point.y);
+                this.insertKeyframe(tick, this.clip.z, newPos.point.z);
+            } else {
+                // 非 lookAt / 非叠加：XYZ 写帧级通道（每帧独立游动值 / 追踪相对 / 追踪绝对）
+                this.insertFrameKeyframes(tick, newPos);
             }
-            this.insertKeyframe(tick, this.clip.x, newPos.point.x - ax);
-            this.insertKeyframe(tick, this.clip.y, newPos.point.y - ay);
-            this.insertKeyframe(tick, this.clip.z, newPos.point.z - az);
             this.insertKeyframe(tick, this.clip.yaw, (double) newPos.angle.yaw);
             this.insertKeyframe(tick, this.clip.pitch, (double) newPos.angle.pitch);
             this.insertKeyframe(tick, this.clip.roll, (double) newPos.angle.roll);
             this.insertKeyframe(tick, this.clip.fov, (double) newPos.angle.fov);
+        }
+    }
+
+    /** 三轴一起写帧级关键帧：取该 tick 追踪锚点（无追踪时锚点 = 相机），逐轴更新。 */
+    private void insertFrameKeyframes(float tick, Position newPos) {
+        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+        boolean tracked = hasTrackTarget(this.clip, tick);
+        double[] cameras = {newPos.point.x, newPos.point.y, newPos.point.z};
+        double[] anchors = new double[3];
+        for (int axis = 0; axis < 3; axis++) {
+            anchors[axis] = tracked && panel != null
+                ? anchorAxisAt(this.clip, panel, axis, tick)
+                : cameras[axis];
+        }
+        this.insertFrameKeyframe(tick, this.clip.xd, cameras[0], anchors[0]);
+        this.insertFrameKeyframe(tick, this.clip.yd, cameras[1], anchors[1]);
+        this.insertFrameKeyframe(tick, this.clip.zd, cameras[2], anchors[2]);
+    }
+
+    /** 单轴帧级关键帧：有段继承插值帧（保留模式），无段新建；三值按当前相机写入。 */
+    private void insertFrameKeyframe(float tick, KeyframeChannel<XyzFrameData> channel, double camera, double anchor) {
+        KeyframeSegment<XyzFrameData> segment = channel.findSegment(tick);
+        XyzFrameData data = segment != null ? segment.createInterpolated() : new XyzFrameData();
+        data.roamValue = camera;
+        data.trackRelative = camera - anchor;
+        data.trackAbsolute = camera;
+        int insert = channel.insert(tick, data);
+        if (segment != null) {
+            channel.get(insert).copyOverExtra(segment.a);
         }
     }
 
@@ -300,33 +327,63 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         super.fillData();
         this.updateDuration(this.clip.duration.get());
         this.keyframes.setClip(this.clip);
-        // v0.3：UIKeyframeEditor.setClip 只遍历 channels 数组（8 个数值通道），这里手动补挂 anchor 通道
-        this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
-        // v1.5.4-Alpha 四版：新建剪辑默认在 tick 0 放一个「空 anchor 关键帧」（未绑定任何模型）。
-        // 作为「游动 / 追踪」两条路线的分派锚点：anchor 无绑定 → 游动路线自动生效；
-        // 有绑定目标 → 追踪路线自动生效（游动的两值与追踪的两值互不串用）。
+
+        // 新建剪辑默认在 tick 0 放一个「空 anchor 关键帧」（未绑定任何模型），
+        // 作为游动 / 追踪两条路线的分派锚点。
         if (this.clip.anchor.isEmpty()) {
             this.clip.anchor.insert(0, KeyframeFactories.ANCHOR.createEmpty());
         }
-        // v1.1：给 X / Y / Z 通道设置 seed —— 新建关键帧（无插值段可继承）时按「主继承模式」供给继承值。
-        // v1.4.1：扩展覆盖 偏航/俯仰/横滚/视野（无关键帧新建帧不再默认 0，继承摄像机默认视角）。
+
+        // 记录 setClip 生成的 8 个数值 sheet 的标题 / 颜色（重建后保持一致）
+        Map<KeyframeChannel, IKey> titles = new HashMap<>();
+        Map<KeyframeChannel, Integer> colors = new HashMap<>();
         for (UIKeyframeSheet sheet : this.keyframes.view.getGraph().getSheets()) {
-            if (sheet.channel == this.clip.x) {
-                this.setSeed(sheet, 0);
-            } else if (sheet.channel == this.clip.y) {
-                this.setSeed(sheet, 1);
-            } else if (sheet.channel == this.clip.z) {
-                this.setSeed(sheet, 2);
+            titles.put(sheet.channel, sheet.defaultTitle);
+            colors.put(sheet.channel, sheet.defaultColor);
+        }
+
+        // 重建 sheets：X / Y / Z 换成帧级通道 xd / yd / zd，其余顺序不变，anchor 收尾
+        this.keyframes.view.removeAllSheets();
+        this.appendFrameSheet("xd", this.clip.xd, this.clip.x, titles, colors);
+        this.appendFrameSheet("yd", this.clip.yd, this.clip.y, titles, colors);
+        this.appendFrameSheet("zd", this.clip.zd, this.clip.z, titles, colors);
+        this.appendReusedSheet("yaw", this.clip.yaw, titles, colors);
+        this.appendReusedSheet("pitch", this.clip.pitch, titles, colors);
+        this.appendReusedSheet("roll", this.clip.roll, titles, colors);
+        this.appendReusedSheet("fov", this.clip.fov, titles, colors);
+        this.appendReusedSheet("distance", this.clip.distance, titles, colors);
+        this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
+
+        // seed：帧级通道（XyzFrameData）+ 角度 / 视野（Double，无帧段时继承摄像机默认视角）
+        for (UIKeyframeSheet sheet : this.keyframes.view.getGraph().getSheets()) {
+            if (sheet.channel == this.clip.xd) {
+                sheet.seed(() -> this.frameSeedValue(0));
+            } else if (sheet.channel == this.clip.yd) {
+                sheet.seed(() -> this.frameSeedValue(1));
+            } else if (sheet.channel == this.clip.zd) {
+                sheet.seed(() -> this.frameSeedValue(2));
             } else if (sheet.channel == this.clip.yaw) {
-                this.setSeed(sheet, 3);
+                sheet.seed(() -> this.defaultSeedValue(3));
             } else if (sheet.channel == this.clip.pitch) {
-                this.setSeed(sheet, 4);
+                sheet.seed(() -> this.defaultSeedValue(4));
             } else if (sheet.channel == this.clip.roll) {
-                this.setSeed(sheet, 5);
+                sheet.seed(() -> this.defaultSeedValue(5));
             } else if (sheet.channel == this.clip.fov) {
-                this.setSeed(sheet, 6);
+                sheet.seed(() -> this.defaultSeedValue(6));
             }
         }
+    }
+
+    /** 帧级通道 sheet（XyzFrameData），标题 / 颜色沿用对应旧 Double 通道。 */
+    private void appendFrameSheet(String id, KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old,
+                                  Map<KeyframeChannel, IKey> titles, Map<KeyframeChannel, Integer> colors) {
+        this.keyframes.view.addSheet(new UIKeyframeSheet(id, titles.get(old), this.colorOf(old, colors), data, null));
+    }
+
+    /** 重建数值 sheet（沿用其原标题 / 颜色）。 */
+    private void appendReusedSheet(String id, KeyframeChannel<Double> channel,
+                                   Map<KeyframeChannel, IKey> titles, Map<KeyframeChannel, Integer> colors) {
+        this.keyframes.view.addSheet(new UIKeyframeSheet(id, titles.get(channel), this.colorOf(channel, colors), channel, null));
     }
 
     private void appendSheet(String id, IKey title, int color, KeyframeChannel<?> channel) {
@@ -336,13 +393,28 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         }
     }
 
-    /** v1.1：为 X/Y/Z 通道 sheet 挂「主继承值」seed（无插值段新建关键帧时使用）。 */
-    private void setSeed(UIKeyframeSheet sheet, int axis) {
-        sheet.seed(() -> this.inheritSeedValue(axis));
+    private int colorOf(KeyframeChannel channel, Map<KeyframeChannel, Integer> colors) {
+        Integer color = colors.get(channel);
+        return color == null ? 0 : color;
     }
 
-    /** 按剪辑主继承模式计算当前播放头处的继承值：通道值恒为「相对偏移」；绝对显示 = 相对 + 锚点。 */
-    private Object inheritSeedValue(int axis) {
+    /** 帧级通道 seed：用当前相机位置填三值（游动值 = 相机；追踪相对 = 相机 − 锚点；追踪绝对 = 相机）。 */
+    private XyzFrameData frameSeedValue(int axis) {
+        UIFilmPanel panel = this.getParent(UIFilmPanel.class);
+        float tick = ((UIFilmKeyframes) this.keyframes.view).getOffset();
+        double camera = cameraAxisAt(panel, axis);
+        double anchor = hasTrackTarget(this.clip, tick) && panel != null
+            ? anchorAxisAt(this.clip, panel, axis, tick)
+            : camera;
+        XyzFrameData data = new XyzFrameData();
+        data.roamValue = camera;
+        data.trackRelative = camera - anchor;
+        data.trackAbsolute = camera;
+        return data;
+    }
+
+    /** 角度 / 视野 seed：通道有值取插值；空时取摄像机默认视角。 */
+    private Double defaultSeedValue(int axis) {
         KeyframeChannel<Double> channel = this.channelAt(axis);
         if (channel == null) {
             return null;
@@ -363,13 +435,11 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
      */
     public static double defaultInheritValue(MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
         if (axis <= 2) {
-            // X / Y / Z：按当前路线决定继承值
+            // X / Y / Z（旧 Double 通道打点兜底）：追踪路线取「相机 − 锚点」；游动路线取相机
             double camera = cameraAxisAt(panel, axis);
             if (isTracked(clip, panel, tick)) {
-                // 追踪路线：相对 = 相机 − 锚点（偏移）；绝对 = 相机（绝对坐标）
-                return clip.trackInheritMode == 1 ? camera : camera - anchorAxisAt(clip, panel, axis, tick);
+                return camera - anchorAxisAt(clip, panel, axis, tick);
             }
-            // 游动路线：绝对坐标（相对 / 绝对小模式同值，播放时靠 offset 调试值区分）
             return camera;
         }
         CameraController controller = panel.getCameraController();
@@ -442,35 +512,32 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     }
 
     /**
-     * v1.4.1：将 XYZ 相对值通道在「当前播放头 tick」处的关键帧值归零。
-     * 锚点绑定（模型/部位）变更后调用：当前帧摄像机立即贴回锚点，
-     * 避免旧相对偏移把摄像机甩到较远位置。
-     * v1.5.4-Alpha：不再破坏其他帧的关键帧值；且**绝不插入新帧**——
-     * 当前 tick 处没有关键帧（如新建剪辑 XYZ 通道为空）时保持原状，
-     * 避免「锁 0」现象（插入 0 值帧会覆盖默认继承值，摄像机被读回 XYZ=0 区域）。
-     * v1.5.4-Alpha 四版：改为「锚点感知归零」——仅当当前帧有有效的追踪锚点时，
-     * 把该帧值写为「相机位置 − 锚点」（贴回锚点，偏移为 0）；
-     * 锚点无效（模型缺失 / 部位解析失败）时**保留原值**，不再把帧写成 0
-     * （否则无锚点游动时该 0 值帧被当作绝对坐标 0,0,0，摄像机仍会飞回原点）。
+     * 锚点绑定（模型 / 部位）变更后调用：当前帧摄像机立即贴回锚点，避免旧相对偏移把相机甩远。
+     * 仅更新 tick 处已存在的帧级关键帧（绝不新增帧）；追踪锚点有效时：
+     * 游动值 = 锚点、追踪相对 = 0、追踪绝对 = 锚点（相机贴回锚点）；
+     * 锚点无效时保留原值（游动语义，不跳 0）。
      */
     public static void resetXyzRelative(MultiTrackerClientClip clip, UIFilmPanel panel, float tick) {
         if (clip == null) {
             return;
         }
-        resetChannel(clip.x, clip, panel, 0, tick);
-        resetChannel(clip.y, clip, panel, 1, tick);
-        resetChannel(clip.z, clip, panel, 2, tick);
+        resetFrameChannel(clip.xd, clip, panel, 0, tick);
+        resetFrameChannel(clip.yd, clip, panel, 1, tick);
+        resetFrameChannel(clip.zd, clip, panel, 2, tick);
     }
 
-    /** v1.5.4-Alpha 四版：仅当 tick 处已有关键帧且追踪锚点有效时才「贴回锚点」，绝不新增关键帧。 */
-    private static void resetChannel(KeyframeChannel<Double> channel, MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
+    /** 仅当 tick 处已有帧级关键帧且追踪锚点有效时才「贴回锚点」，绝不新增关键帧。 */
+    private static void resetFrameChannel(KeyframeChannel<XyzFrameData> channel, MultiTrackerClientClip clip, UIFilmPanel panel, int axis, float tick) {
         for (Keyframe keyframe : channel.getKeyframes()) {
             if (keyframe.getTick() == tick) {
+                XyzFrameData data = (XyzFrameData) keyframe.getValue();
                 if (isTracked(clip, panel, tick)) {
-                    // 追踪锚点有效：相机贴回锚点（相对偏移归零）
-                    keyframe.setValue(cameraAxisAt(panel, axis) - anchorAxisAt(clip, panel, axis, tick));
+                    // 相机贴回锚点：游动值 / 追踪绝对 = 锚点；追踪相对 = 0
+                    double anchor = anchorAxisAt(clip, panel, axis, tick);
+                    data.roamValue = anchor;
+                    data.trackRelative = 0.0D;
+                    data.trackAbsolute = anchor;
                 }
-                // 锚点无效：保留原值（游动语义，不跳 0）
                 return;
             }
         }

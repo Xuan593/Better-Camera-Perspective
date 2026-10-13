@@ -25,6 +25,8 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
+import perspective.better_camera_perspective.client.data.XyzFrameData;
+import perspective.better_camera_perspective.client.data.XyzFrameDataKeyframeFactory;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 /**
@@ -62,34 +64,19 @@ public class MultiTrackerClientClip extends KeyframeClip {
      * 相邻关键帧目标不同时按 previous/x 过渡插值，跨演员平滑切换。
      */
     public final KeyframeChannel<Anchor> anchor = new KeyframeChannel<>("anchor", KeyframeFactories.ANCHOR);
+
+    /**
+     * 帧级小类存储通道（V1.5.4-Alpha 十版重构）：
+     * 每个 XYZ 关键帧独立携带「游动值 / 追踪相对 / 追踪绝对 / 帧级游动模式 / 帧级追踪模式」，
+     * 游动与追踪各存各的、模式每帧独立，不再共用 double 池或剪辑级共享模式，
+     * 杜绝「游动段 ⇄ 追踪段」相互污染导致的坐标偏差。
+     */
+    public final KeyframeChannel<XyzFrameData> xd = new KeyframeChannel<>("xd", XyzFrameDataKeyframeFactory.INSTANCE);
+    public final KeyframeChannel<XyzFrameData> yd = new KeyframeChannel<>("yd", XyzFrameDataKeyframeFactory.INSTANCE);
+    public final KeyframeChannel<XyzFrameData> zd = new KeyframeChannel<>("zd", XyzFrameDataKeyframeFactory.INSTANCE);
+
     /** 相对模式所需的进入本剪辑前的相机位置（等效 EntityClip.position）。 */
     public Position position = new Position(0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
-    /**
-     * v1.1：XYZ 新建关键帧的「主继承模式」（UI 状态，不参与序列化）。
-     * 0 = 相对值（默认）：下一帧新建关键帧继承「相对偏移」；
-     * 1 = 绝对值：下一帧新建关键帧继承「绝对坐标」。
-     * 由关键帧编辑界面的「将主继承相对值 / 将主继承绝对值」按钮切换。
-     *
-     * v1.5.4-Alpha 四版：拆分为「游动 / 追踪」两路线的继承小模式，
-     * 本字段保留兼容（不再被 UI 写入）。
-     */
-    public int inheritMode = 0;
-
-    /**
-     * v1.5.4-Alpha 四版：「游动」路线（anchor 未绑定任何模型时自动生效）的继承小模式。
-     * 0 = 相对（默认）：XYZ 关键帧存绝对坐标，播放再叠加 offset 相对调试值（最终 = 绝对 + 调试）；
-     * 1 = 绝对：XYZ 关键帧存绝对坐标，播放直接用，offset 调试值不参与。
-     * UI 状态，不参与序列化。
-     */
-    public int roamInheritMode = 0;
-
-    /**
-     * v1.5.4-Alpha 四版：「追踪」路线（anchor 绑定模型时自动生效）的继承小模式。
-     * 0 = 相对（默认）：XYZ 关键帧存「相对锚点的偏移」，播放按「锚点 + 偏移」合成；
-     * 1 = 绝对：XYZ 关键帧存「绝对坐标」，播放直接使用（不叠加锚点）。
-     * UI 状态，不参与序列化。
-     */
-    public int trackInheritMode = 0;
 
     public MultiTrackerClientClip() {
         this.add(this.selector);
@@ -100,6 +87,9 @@ public class MultiTrackerClientClip extends KeyframeClip {
         this.add(this.relative);
         this.add(this.active);
         this.add(this.anchor);
+        this.add(this.xd);
+        this.add(this.yd);
+        this.add(this.zd);
     }
 
     @Override
@@ -200,129 +190,31 @@ public class MultiTrackerClientClip extends KeyframeClip {
         // —— 3) 关键帧插值（KeyframeClip 的全部逻辑）—— 关键帧优先。
         super.applyClip(context, position);
 
-        // —— 3.5) 路线过渡（anchor 关键帧 <无> ⇄ 绑定模型之间的平滑混合）——
-        // 游动视角（关键帧绝对 + offset 调试）→ 追踪视角（锚点 + 偏移 / 绝对）之间按段内进度 lerp，
-        // 不再瞬间跳转。仅在相对模式（非 lookAt / 非叠加）生效，与步骤 4 / 5 同一前提。
+        // —— 3.5) XYZ 帧级小类存储求值 + 游动⇄追踪过渡（V1.5.4-Alpha 十版）——
+        // 每帧独立的「游动值 / 追踪相对 / 追踪绝对 + 帧级模式」，三轴分别求最终世界坐标；
+        // 游动 ⇄ 追踪段（anchor 相邻帧状态不同）两端按段内进度 lerp，
+        // 不再瞬间跳转，也不再共用池子相互污染。仅在相对模式（非 lookAt / 非叠加）生效。
         if (relativeMode) {
-            RouteBlend rb = this.routeBlend(this.anchor, tick);
-            if (rb != null && rb.t > 0.0F && rb.t < 1.0F) {
-                // —— 游动端合成（同步骤 5 语义）——
-                boolean roamAbs = this.roamInheritMode == 1;
-                Point debug = this.offset.get();
-                double roamX = safeValue(this.x, tick, basePosition.point.x);
-                double roamY = safeValue(this.y, tick, basePosition.point.y);
-                double roamZ = safeValue(this.z, tick, basePosition.point.z);
-                if (!roamAbs) {
-                    roamX += debug.x;
-                    roamY += debug.y;
-                    roamZ += debug.z;
-                }
-                float roamYaw = (float) safeValue(this.yaw, tick, (double) basePosition.angle.yaw);
-                float roamPitch = (float) safeValue(this.pitch, tick, (double) basePosition.angle.pitch);
-                float roamRoll = (float) safeValue(this.roll, tick, (double) basePosition.angle.roll);
+            RouteBlend rb = this.routeBlend(context, tick, lookAt);
+            Point debug = this.offset.get();
 
-                // —— 追踪端合成（同步骤 4 语义，锚点用绑定端 anchor 解析）——
-                Anchor target = rb.a != null && rb.a.hasTarget() ? rb.a : rb.b;
-                double tx = 0.0D, ty = 0.0D, tz = 0.0D;
-                float tyaw = basePosition.angle.yaw, tpitch = basePosition.angle.pitch, troll = basePosition.angle.roll;
-                if (target != null && target.hasTarget()) {
-                    Position cur = this.track(context, position, target.replay, target.attachment, lookAt);
-                    if (cur != null) {
-                        tx = cur.point.x;
-                        ty = cur.point.y;
-                        tz = cur.point.z;
-                        tyaw = cur.angle.yaw;
-                        tpitch = cur.angle.pitch;
-                        troll = cur.angle.roll;
-                    }
-                }
-                boolean trackAbs = this.trackInheritMode == 1;
-                double trackX = trackAbs ? safeValue(this.x, tick, tx) : tx + safeValue(this.x, tick, 0.0D);
-                double trackY = trackAbs ? safeValue(this.y, tick, ty) : ty + safeValue(this.y, tick, 0.0D);
-                double trackZ = trackAbs ? safeValue(this.z, tick, tz) : tz + safeValue(this.z, tick, 0.0D);
-                trackYaw = (float) safeValue(this.yaw, tick, (double) tyaw);
-                trackPitch = (float) safeValue(this.pitch, tick, (double) tpitch);
-                trackRoll = (float) safeValue(this.roll, tick, (double) troll);
-
-                // 混合方向：a 绑定 → b <无>（追踪→游动）反向；a <无> → b 绑定（游动→追踪）正向
-                float t = rb.a != null && rb.a.hasTarget() ? 1.0F - rb.t : rb.t;
-                if (this.isActive(0)) {
-                    position.point.x = roamX + (trackX - roamX) * t;
-                }
-                if (this.isActive(1)) {
-                    position.point.y = roamY + (trackY - roamY) * t;
-                }
-                if (this.isActive(2)) {
-                    position.point.z = roamZ + (trackZ - roamZ) * t;
-                }
-                if (this.isActive(3)) {
-                    position.angle.yaw = lerpAngle(roamYaw, trackYaw, t);
-                }
-                if (this.isActive(4)) {
-                    position.angle.pitch = lerpAngle(roamPitch, trackPitch, t);
-                }
-                if (this.isActive(5)) {
-                    position.angle.roll = lerpAngle(roamRoll, trackRoll, t);
-                }
-            } else if (tracked) {
-                // —— 4) 追踪路线（anchor 绑定模型）：按「追踪继承小模式」合成 XYZ ——
-                // 相对（默认）：锚点 + 关键帧偏移（通道空 / 播放头无帧段 = 纯追踪锚点）；
-                // 绝对：关键帧值即绝对坐标（空 / 无帧段回退锚点）。
-                // 角度：关键帧有值且播放头有帧段 → 保留插值；空 / 无帧段 → 回退追踪角度（不再被读成 0）。
-                // 追踪未解析（trackResolved=false）：锚点 0，空通道 / 无帧段回退进入前位置（不飞 0 0 0）。
-                boolean trackAbs = this.trackInheritMode == 1;
-                if (this.isActive(0)) {
-                    position.point.x = trackAbs
-                        ? safeValue(this.x, tick, trackResolved ? anchorX : basePosition.point.x)
-                        : anchorX + safeValue(this.x, tick, trackResolved ? 0.0D : basePosition.point.x);
-                }
-                if (this.isActive(1)) {
-                    position.point.y = trackAbs
-                        ? safeValue(this.y, tick, trackResolved ? anchorY : basePosition.point.y)
-                        : anchorY + safeValue(this.y, tick, trackResolved ? 0.0D : basePosition.point.y);
-                }
-                if (this.isActive(2)) {
-                    position.point.z = trackAbs
-                        ? safeValue(this.z, tick, trackResolved ? anchorZ : basePosition.point.z)
-                        : anchorZ + safeValue(this.z, tick, trackResolved ? 0.0D : basePosition.point.z);
-                }
-                if (this.isActive(3)) {
-                    position.angle.yaw = (float) safeValue(this.yaw, tick, (double) trackYaw);
-                }
-                if (this.isActive(4)) {
-                    position.angle.pitch = (float) safeValue(this.pitch, tick, (double) trackPitch);
-                }
-                if (this.isActive(5)) {
-                    position.angle.roll = (float) safeValue(this.roll, tick, (double) trackRoll);
-                }
-            } else {
-                // —— 5) 游动路线（anchor 未绑定模型）：XYZ 以绝对值为准 ——
-                // 通道有值且播放头有帧段：关键帧值即绝对坐标；空 / 无帧段：回退进入本剪辑前的相机位置（不再飞回 0 0 0）。
-                // 相对（默认）：再叠加 offset 相对调试值（最终 = 绝对 + 调试）；绝对：offset 不参与。
-                // 角度：有值且播放头有帧段 → 保留插值；空 / 无帧段 → 回退进入前角度（不再被读成 0 / 平视跳变）。
-                boolean roamAbs = this.roamInheritMode == 1;
-                Point debug = this.offset.get();
-                if (this.isActive(0)) {
-                    double v = safeValue(this.x, tick, basePosition.point.x);
-                    position.point.x = roamAbs ? v : v + debug.x;
-                }
-                if (this.isActive(1)) {
-                    double v = safeValue(this.y, tick, basePosition.point.y);
-                    position.point.y = roamAbs ? v : v + debug.y;
-                }
-                if (this.isActive(2)) {
-                    double v = safeValue(this.z, tick, basePosition.point.z);
-                    position.point.z = roamAbs ? v : v + debug.z;
-                }
-                if (this.isActive(3)) {
-                    position.angle.yaw = (float) safeValue(this.yaw, tick, (double) basePosition.angle.yaw);
-                }
-                if (this.isActive(4)) {
-                    position.angle.pitch = (float) safeValue(this.pitch, tick, (double) basePosition.angle.pitch);
-                }
-                if (this.isActive(5)) {
-                    position.angle.roll = (float) safeValue(this.roll, tick, (double) basePosition.angle.roll);
-                }
+            if (this.isActive(0)) {
+                position.point.x = this.resolvePointAxis(0, tick, tracked, trackResolved, anchorX, basePosition.point.x, debug.x, rb);
+            }
+            if (this.isActive(1)) {
+                position.point.y = this.resolvePointAxis(1, tick, tracked, trackResolved, anchorY, basePosition.point.y, debug.y, rb);
+            }
+            if (this.isActive(2)) {
+                position.point.z = this.resolvePointAxis(2, tick, tracked, trackResolved, anchorZ, basePosition.point.z, debug.z, rb);
+            }
+            if (this.isActive(3)) {
+                position.angle.yaw = this.resolveAngleAxis(0, tick, tracked, trackYaw, basePosition.angle.yaw, rb);
+            }
+            if (this.isActive(4)) {
+                position.angle.pitch = this.resolveAngleAxis(1, tick, tracked, trackPitch, basePosition.angle.pitch, rb);
+            }
+            if (this.isActive(5)) {
+                position.angle.roll = this.resolveAngleAxis(2, tick, tracked, trackRoll, basePosition.angle.roll, rb);
             }
         }
 
@@ -342,17 +234,18 @@ public class MultiTrackerClientClip extends KeyframeClip {
     }
 
     /**
-     * v1.5.4-Alpha 八版：检测 anchor 关键帧的「路线过渡段」。
-     * tick 所在段的相邻两帧 anchor 值状态不同（<无> ⇄ 绑定模型）时返回混合信息；
-     * 两端状态相同（同为 <无> 或同为绑定）返回 null（无过渡，走对应路线逻辑）。
+     * V1.5.4-Alpha 十版：检测 anchor 关键帧的「游动⇄追踪过渡段」。
+     * tick 所在段相邻两帧 anchor 状态不同（<无> ⇄ 绑定模型）时返回混合信息，
+     * 并解析追踪端（绑定端）在当前 tick 的锚点 Position（不与其他 anchor 帧混合）；
+     * 两端状态相同返回 null（无过渡，走对应路线）。
      */
-    private static RouteBlend routeBlend(KeyframeChannel<Anchor> channel, float tick) {
-        if (channel == null || channel.isEmpty()) {
+    private RouteBlend routeBlend(ClipContext context, float tick, boolean lookAt) {
+        if (this.anchor == null || this.anchor.isEmpty()) {
             return null;
         }
         Keyframe a = null;
         Keyframe b = null;
-        for (Keyframe keyframe : channel.getKeyframes()) {
+        for (Keyframe keyframe : this.anchor.getKeyframes()) {
             if (keyframe.getTick() <= tick) {
                 a = keyframe;
             } else if (b == null) {
@@ -374,20 +267,97 @@ public class MultiTrackerClientClip extends KeyframeClip {
             return null;
         }
         float t = Math.min(1.0F, Math.max(0.0F, (tick - a.getTick()) / span));
-        return new RouteBlend(av, bv, t);
+        RouteBlend rb = new RouteBlend(t);
+        // 追踪端 = 绑定模型的 anchor 帧，单独解析其当前 tick 位置 / 角度
+        Anchor trackEnd = aTarget ? av : bv;
+        Position cur = this.track(context, this.position, trackEnd.replay, trackEnd.attachment, lookAt);
+        if (cur != null) {
+            rb.trackPoint[0] = (float) cur.point.x;
+            rb.trackPoint[1] = (float) cur.point.y;
+            rb.trackPoint[2] = (float) cur.point.z;
+            rb.trackAngle[0] = cur.angle.yaw;
+            rb.trackAngle[1] = cur.angle.pitch;
+            rb.trackAngle[2] = cur.angle.roll;
+            rb.trackResolved = true;
+        }
+        return rb;
     }
 
-    /** 路线过渡信息：段两端 anchor 值（绑定端用于解析追踪锚点）+ 段内进度 t（0~1）。 */
+    /** 路线过渡信息：段内进度 t + 追踪端锚点在当前 tick 的位置 / 角度。 */
     private static final class RouteBlend {
-        final Anchor a;
-        final Anchor b;
         final float t;
+        final float[] trackPoint = new float[3];
+        final float[] trackAngle = new float[3];
+        boolean trackResolved;
 
-        RouteBlend(Anchor a, Anchor b, float t) {
-            this.a = a;
-            this.b = b;
+        RouteBlend(float t) {
             this.t = t;
         }
+    }
+
+    /** 取某轴当前 tick 的帧级数据（新通道优先；空时回退父类老 Double 通道，兼容老存档）。 */
+    private static XyzFrameData fdAt(KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old, float tick) {
+        if (!data.isEmpty() && data.findSegment(tick) != null) {
+            return data.interpolate(tick);
+        }
+        if (!old.isEmpty() && old.findSegment(tick) != null) {
+            double v = old.interpolate(tick);
+            return new XyzFrameData(v, v, v, 0, 0);
+        }
+        return null;
+    }
+
+    /** 游动端世界坐标：帧 roamValue（相对模式再叠加 offset 调试；绝对模式直接用）。无数据回退 baseAxis。 */
+    private double roamWorld(KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old, float tick,
+                             double baseAxis, double debugAxis) {
+        XyzFrameData fd = fdAt(data, old, tick);
+        if (fd == null) {
+            return baseAxis;
+        }
+        return fd.roamMode == 1 ? fd.roamValue : fd.roamValue + debugAxis;
+    }
+
+    /** 追踪端世界坐标：绝对模式用帧 trackAbsolute；相对模式用「锚点 + trackRelative」。无数据回退锚点 / baseAxis。 */
+    private double trackWorld(KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old, float tick,
+                              double anchorAxis, boolean anchorResolved, double baseAxis) {
+        XyzFrameData fd = fdAt(data, old, tick);
+        if (fd == null) {
+            return anchorResolved ? anchorAxis : baseAxis;
+        }
+        if (fd.trackMode == 1) {
+            return fd.trackAbsolute;
+        }
+        return anchorResolved ? anchorAxis + fd.trackRelative : baseAxis;
+    }
+
+    /** 求一个位置轴的最终世界坐标（含游动⇄追踪过渡）。 */
+    private double resolvePointAxis(int axis, float tick, boolean tracked, boolean trackResolved,
+                                    double anchorAxis, double baseAxis, double debugAxis, RouteBlend rb) {
+        KeyframeChannel<XyzFrameData> data = axis == 0 ? this.xd : axis == 1 ? this.yd : this.zd;
+        KeyframeChannel<Double> old = axis == 0 ? this.x : axis == 1 ? this.y : this.z;
+        boolean inBlend = rb != null && rb.t > 0.0F && rb.t < 1.0F;
+        if (inBlend) {
+            double roam = this.roamWorld(data, old, tick, baseAxis, debugAxis);
+            double track = this.trackWorld(data, old, tick, rb.trackPoint[axis], rb.trackResolved, baseAxis);
+            return roam + (track - roam) * (double) rb.t;
+        }
+        if (tracked) {
+            return this.trackWorld(data, old, tick, anchorAxis, trackResolved, baseAxis);
+        }
+        return this.roamWorld(data, old, tick, baseAxis, debugAxis);
+    }
+
+    /** 求一个角度轴的最终角度（过渡段：游动端与追踪端按 t 走最短弧；否则关键帧插值，回退对应路线角度）。 */
+    private float resolveAngleAxis(int axis, float tick, boolean tracked, float trackFallback,
+                                   float baseFallback, RouteBlend rb) {
+        KeyframeChannel<Double> ch = axis == 0 ? this.yaw : axis == 1 ? this.pitch : this.roll;
+        boolean inBlend = rb != null && rb.t > 0.0F && rb.t < 1.0F;
+        if (inBlend) {
+            float roam = (float) safeValue(ch, tick, (double) baseFallback);
+            float track = (float) safeValue(ch, tick, (double) rb.trackAngle[axis]);
+            return lerpAngle(roam, track, rb.t);
+        }
+        return (float) safeValue(ch, tick, tracked ? (double) trackFallback : (double) baseFallback);
     }
 
     /** 追踪求值：返回按 active 位过滤后的 Position 副本；目标实体或帧无效时返回 null。 */
