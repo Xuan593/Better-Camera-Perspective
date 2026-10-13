@@ -25,8 +25,8 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
-import perspective.better_camera_perspective.client.data.XyzFrameData;
-import perspective.better_camera_perspective.client.data.XyzFrameDataKeyframeFactory;
+import perspective.better_camera_perspective.data.XyzFrameData;
+import perspective.better_camera_perspective.data.XyzFrameDataKeyframeFactory;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 /**

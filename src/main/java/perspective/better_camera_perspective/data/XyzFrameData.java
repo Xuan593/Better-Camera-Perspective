@@ -1,4 +1,4 @@
-package perspective.better_camera_perspective.client.data;
+package perspective.better_camera_perspective.data;
 
 import mchorse.bbs_mod.data.types.MapType;
 
@@ -9,7 +9,7 @@ import mchorse.bbs_mod.data.types.MapType;
  * 不再共用一个 double 池、也不再读剪辑级共享模式，杜绝跨路线相互污染：
  *
  * <ul>
- *   <li>{@link #roamValue}：游动路线（anchor 关键帧值为 <无>）的世界坐标；
+ *   <li>{@link #roamValue}：游动路线（anchor 关键帧值为 {@code <无>}）的世界坐标；
  *       游动的「相对 / 绝对」两值无锚点可换算，二者同值。</li>
  *   <li>{@link #trackRelative}：追踪路线（anchor 绑定模型）的相对锚点偏移。</li>
  *   <li>{@link #trackAbsolute}：追踪路线的绝对世界坐标。
@@ -20,6 +20,11 @@ import mchorse.bbs_mod.data.types.MapType;
  * </ul>
  *
  * 序列化：5 个字段写 MapType（与 BBS Anchor 值同风格）。
+ *
+ * <p>注意：本类与工厂随 {@code xd / yd / zd} 关键帧通道一起被 BBS 的
+ * {@code KeyframeChannel} 序列化。BBS 的通道读写依赖全局类型注册表
+ * {@code KeyframeFactories.FACTORIES}（见 {@code RegisterKeyframeFactoriesEvent}），
+ * 因此工厂必须在启动时注册，否则通道存档时写不出类型、读档时 keyframes 会被整段丢弃。</p>
  */
 public class XyzFrameData {
     /** 游动路线世界坐标（游动相对 / 绝对同值）。 */

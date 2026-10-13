@@ -14,7 +14,7 @@ import mchorse.bbs_mod.utils.keyframes.Keyframe;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
-import perspective.better_camera_perspective.client.data.XyzFrameData;
+import perspective.better_camera_perspective.data.XyzFrameData;
 
 import java.util.function.Consumer;
 

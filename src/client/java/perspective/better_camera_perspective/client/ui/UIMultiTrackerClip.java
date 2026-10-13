@@ -38,7 +38,7 @@ import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
-import perspective.better_camera_perspective.client.data.XyzFrameData;
+import perspective.better_camera_perspective.data.XyzFrameData;
 
 import java.util.HashMap;
 import java.util.Map;

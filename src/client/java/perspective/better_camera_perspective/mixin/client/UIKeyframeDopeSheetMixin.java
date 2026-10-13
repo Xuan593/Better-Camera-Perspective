@@ -24,7 +24,7 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import perspective.better_camera_perspective.client.BcpKeyframeProcessing;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
-import perspective.better_camera_perspective.client.data.XyzFrameData;
+import perspective.better_camera_perspective.data.XyzFrameData;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 import java.util.HashMap;
