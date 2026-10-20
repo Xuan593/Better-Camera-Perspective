@@ -48,7 +48,14 @@ public class UIPhaseKeyframeFactory extends UIKeyframeFactory<PhaseFrameData> {
         UILabel title = new UILabel(IKey.raw("相位追踪"), COLOR_PHASE);
         title.relative(this.scroll).w(1.0F).h(20);
         this.scroll.add(title);
-        this.scroll.add(UI.row(2, 0, 0, this.toggleButton, new UILabel(IKey.raw("跟随强度"), COLOR_PHASE), this.smoothValue));
+
+        // 两行对齐式：固定宽度标签 + 控件（与 XYZ 值面板行式风格统一，消除拥挤错位）
+        UILabel onLabel = new UILabel(IKey.raw("开关"), COLOR_PHASE);
+        onLabel.wh(88, 16);
+        UILabel smoothLabel = new UILabel(IKey.raw("跟随强度"), COLOR_PHASE);
+        smoothLabel.wh(88, 16);
+        this.scroll.add(UI.row(2, 0, 0, onLabel, this.toggleButton));
+        this.scroll.add(UI.row(2, 0, 0, smoothLabel, this.smoothValue));
 
         this.refresh();
     }
