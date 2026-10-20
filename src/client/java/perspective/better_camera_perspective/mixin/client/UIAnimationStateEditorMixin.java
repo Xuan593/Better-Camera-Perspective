@@ -1,5 +1,6 @@
 package perspective.better_camera_perspective.mixin.client;
 
+import mchorse.bbs_mod.forms.states.AnimationState;
 import mchorse.bbs_mod.ui.forms.editors.states.keyframes.UIAnimationStateEditor;
 import mchorse.bbs_mod.ui.framework.elements.input.items.FoldState;
 import mchorse.bbs_mod.ui.framework.elements.input.keyframes.UIKeyframeSheet;
@@ -37,7 +38,7 @@ public class UIAnimationStateEditorMixin {
     private FoldState<String> expandedTabs;
 
     @Inject(method = "setState", at = @At("RETURN"))
-    private void bcp$setState(UIAnimationStateEditor state, CallbackInfo ci) {
+    private void bcp$setState(AnimationState state, CallbackInfo ci) {
         if (BcpKeyframeProcessing.getExpandMode() != BcpKeyframeProcessing.EXPAND_ORIGINAL_IDX) {
             return;
         }
