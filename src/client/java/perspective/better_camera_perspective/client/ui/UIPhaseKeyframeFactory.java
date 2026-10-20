@@ -15,17 +15,17 @@ import perspective.better_camera_perspective.data.PhaseFrameData;
 import java.util.function.Consumer;
 
 /**
- * 相位追踪轴帧值编辑工厂（V1.6.1-Alpha）。
+ * 相位追踪轴帧值编辑工厂（V1.6.1-Alpha → V1.6.1 转正）。
  *
- * 选中多样追踪剪辑的「相位追踪」帧级关键帧时，显示：
+ * 选中多样追踪剪辑的「相位追踪」帧级关键帧时，显示（亮紫 0xAA66CC）：
  *
- *   相位追踪（亮紫 0xAA66CC）
- *     [关 / 开]  ← 点击切换本帧开关（默认关）
- *     跟随强度   0~1 数值框（默认 0.9：完全盯住演员；调低 = 部分跟随、更平滑）
+ *   相位追踪
+ *   [关 / 开] 跟随强度 [0.9]
  *
- * 开关是事件性的（某帧开 → 播放端持续生效直到某帧关），不随曲线渐变；
- * 跟随强度平滑跟随演员朝向。值只写当前选中帧（PhaseFrameData），
- * 不污染 xd/yd/zd 四值存储与 BBS 全局 PROPERTIES。
+ *  - 开关：点击切换本帧开关（默认关），事件性（某帧开 → 播放端持续生效直到某帧关）；
+ *  - 跟随强度：数值框限制 0~1（默认 0.9：完全盯住演员；调低 = 部分跟随、更平滑）。
+ *
+ * 值只写当前选中帧（PhaseFrameData），不污染 xd/yd/zd 四值存储与 BBS 全局 PROPERTIES。
  */
 @Environment(EnvType.CLIENT)
 public class UIPhaseKeyframeFactory extends UIKeyframeFactory<PhaseFrameData> {
@@ -42,12 +42,13 @@ public class UIPhaseKeyframeFactory extends UIKeyframeFactory<PhaseFrameData> {
         this.toggleButton.wh(64, 16);
         this.smoothValue = new UITrackpad(this::setSmooth);
         this.smoothValue.h(20);
+        // V1.6.1：跟随强度取值范围限制 0~1（播放端同样 clamp，避免 -3.85 之类越界值）
+        this.smoothValue.limit(0, 1);
 
         UILabel title = new UILabel(IKey.raw("相位追踪"), COLOR_PHASE);
         title.relative(this.scroll).w(1.0F).h(20);
         this.scroll.add(title);
-        this.scroll.add(UI.row(2, 0, 0, this.toggleButton));
-        this.scroll.add(UI.row(2, 0, 0, new UILabel(IKey.raw("跟随强度"), COLOR_PHASE), this.smoothValue));
+        this.scroll.add(UI.row(2, 0, 0, this.toggleButton, new UILabel(IKey.raw("跟随强度"), COLOR_PHASE), this.smoothValue));
 
         this.refresh();
     }
