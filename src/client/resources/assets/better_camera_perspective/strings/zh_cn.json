@@ -40,6 +40,10 @@
   "conflict_features.config.keyframe_processing.keyframe_selection.default": "[默认]",
   "conflict_features.config.keyframe_processing.keyframe_selection.single": "[单体]",
   "conflict_features.config.keyframe_processing.keyframe_selection.mixed": "[混合]",
+  "conflict_features.config.keyframe_processing.keyframe_expand": "关键帧展开模式",
+  "conflict_features.config.keyframe_processing.keyframe_expand.tooltip": "动画编辑器关键帧轨道的展开方式：默认（需手动逐个点出所有部件轨道）/ 原始（一次性展开所有部件关键帧，被可视度筛选排除的轨道除外）",
+  "conflict_features.config.keyframe_processing.keyframe_expand.default": "[默认]",
+  "conflict_features.config.keyframe_processing.keyframe_expand.original": "[原始]",
   "conflict_features.config.past_logs.title": "往期日志",
   "conflict_features.config.past_logs.tooltip": "各版本更新履历（.md，最新 → 最旧）"
 }

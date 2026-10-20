@@ -9,6 +9,7 @@
     "UIKeyframeFactoryMixin",
     "UIAnchorKeyframeFactoryMixin",
     "UIKeyframeDopeSheetMixin",
+    "UIAnimationStateEditorMixin",
     "UIClipsAddClipMixin",
     "UIClipsLayerHeightMixin",
     "UISettingsOverlayPanelMixin"

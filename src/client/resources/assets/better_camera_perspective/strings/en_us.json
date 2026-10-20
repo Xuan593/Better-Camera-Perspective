@@ -40,6 +40,10 @@
   "conflict_features.config.keyframe_processing.keyframe_selection.default": "[Default]",
   "conflict_features.config.keyframe_processing.keyframe_selection.single": "[Single]",
   "conflict_features.config.keyframe_processing.keyframe_selection.mixed": "[Mixed]",
+  "conflict_features.config.keyframe_processing.keyframe_expand": "Keyframe expand mode",
+  "conflict_features.config.keyframe_processing.keyframe_expand.tooltip": "How keyframe tracks are expanded in the animation editor: Default (manually click to unfold every part track) / Original (unfold all part keyframes at once, except tracks hidden by visibility filtering)",
+  "conflict_features.config.keyframe_processing.keyframe_expand.default": "[Default]",
+  "conflict_features.config.keyframe_processing.keyframe_expand.original": "[Original]",
   "conflict_features.config.past_logs.title": "Past Logs",
   "conflict_features.config.past_logs.tooltip": "Version history (.md, newest to oldest)"
 }
