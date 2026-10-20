@@ -501,10 +501,20 @@ public class MultiTrackerClientClip extends KeyframeClip {
         return result;
     }
 
-    /** 角度最短弧插值（BBS 角度为弧度制）。 */
+    /**
+     * 角度最短弧插值（BBS 角度通道 yaw/pitch/roll 与 {@link Angle#angle} 均为「角度制・度」，
+     * 与 {@code TrackerFrame.angles} 内部 {@code Math.toRadians} 的口径一致）。
+     *
+     * <p>先把差值转弧度再走 atan2(sin, cos) 取 [-180,180] 最短弧，最后转回度。
+     * 此前误把度直接传给 sin/cos，导致相位追踪跟随强度 0.9 时每帧仅转约 1~2°
+     * （本应转 90%），相机几乎不转向演员、目标始终停在画面边缘——V1.6.1-Alpha 修复。</p>
+     */
     private static float lerpAngle(float a, float b, float t) {
-        float diff = (float) Math.atan2(Math.sin(b - a), Math.cos(b - a));
-        return a + diff * t;
+        double shortest = Math.atan2(
+            Math.sin(Math.toRadians((double) b - (double) a)),
+            Math.cos(Math.toRadians((double) b - (double) a))
+        );
+        return a + (float) Math.toDegrees(shortest) * t;
     }
 
     public boolean isActive(int bit) {
