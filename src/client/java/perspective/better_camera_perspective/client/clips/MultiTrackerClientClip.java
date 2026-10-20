@@ -27,6 +27,8 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 import perspective.better_camera_perspective.data.XyzFrameData;
 import perspective.better_camera_perspective.data.XyzFrameDataKeyframeFactory;
+import perspective.better_camera_perspective.data.PhaseFrameData;
+import perspective.better_camera_perspective.data.PhaseFrameDataKeyframeFactory;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 /**
@@ -75,6 +77,15 @@ public class MultiTrackerClientClip extends KeyframeClip {
     public final KeyframeChannel<XyzFrameData> yd = new KeyframeChannel<>("yd", XyzFrameDataKeyframeFactory.INSTANCE);
     public final KeyframeChannel<XyzFrameData> zd = new KeyframeChannel<>("zd", XyzFrameDataKeyframeFactory.INSTANCE);
 
+    /**
+     * 相位追踪轴（V1.6.1-Alpha）：每帧独立开关（默认关）+ 朝向跟随强度。
+     *
+     * 开启时读取关键帧驱动的最终相机位置与被追踪演员位置，把相机朝向平滑转向演员
+     * （位置不被修改，非完全锁定式跟踪）。值类型 {@link PhaseFrameData}
+     * （单独类属性，不污染 xd/yd/zd 四值存储）。
+     */
+    public final KeyframeChannel<PhaseFrameData> phase = new KeyframeChannel<>("phase", PhaseFrameDataKeyframeFactory.INSTANCE);
+
     /** 相对模式所需的进入本剪辑前的相机位置（等效 EntityClip.position）。 */
     public Position position = new Position(0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 
@@ -90,6 +101,7 @@ public class MultiTrackerClientClip extends KeyframeClip {
         this.add(this.xd);
         this.add(this.yd);
         this.add(this.zd);
+        this.add(this.phase);
     }
 
     @Override
@@ -218,6 +230,12 @@ public class MultiTrackerClientClip extends KeyframeClip {
             }
         }
 
+        // —— 3.6) 相位追踪（V1.6.1-Alpha）——
+        // 帧级开关轴：开启时读取关键帧驱动的最终相机位置与被追踪演员位置，
+        // 把相机朝向平滑转向演员（位置不被修改，非完全锁定式跟踪）。
+        // 目标演员 = 步骤 1 解析后的 sel / grp（anchor 轴当前 tick 优先，回退剪辑属性）。
+        this.applyPhaseTracking(context, tick, sel, grp, position);
+
         // —— 6) 视野：空 / 播放头无帧段回退进入前值（两条路线一致，不再被读成 0）——
         if (this.isActive(6)) {
             position.angle.fov = (float) safeValue(this.fov, tick, (double) basePosition.angle.fov);
@@ -231,6 +249,70 @@ public class MultiTrackerClientClip extends KeyframeClip {
      */
     private static double safeValue(KeyframeChannel<Double> channel, float tick, double fallback) {
         return channel.isEmpty() || channel.findSegment(tick) == null ? fallback : channel.interpolate(tick);
+    }
+
+    /**
+     * 相位追踪轴离散读取（V1.6.1-Alpha）：返回该 tick 处或之前最近的相位关键帧值。
+     * 相位追踪开关是事件性的（某帧开 → 之后一直生效，直到某帧关），不做连续插值；
+     * 播放头早于首帧时回落首帧；通道无任何关键帧返回 null（默认关，功能不干预画面）。
+     */
+    private PhaseFrameData phaseValueAt(float tick) {
+        if (this.phase.isEmpty()) {
+            return null;
+        }
+        PhaseFrameData best = null;
+        PhaseFrameData first = null;
+        float bestTick = -Float.MAX_VALUE;
+        for (Keyframe keyframe : this.phase.getKeyframes()) {
+            PhaseFrameData value = (PhaseFrameData) keyframe.getValue();
+            if (first == null) {
+                first = value;
+            }
+            if (keyframe.getTick() <= tick && keyframe.getTick() >= bestTick) {
+                best = value;
+                bestTick = keyframe.getTick();
+            }
+        }
+        return best != null ? best : first;
+    }
+
+    /**
+     * 相位追踪播放求值（V1.6.1-Alpha）。
+     *
+     * 相位追踪 = 「自动 lookAt」：开启时用关键帧驱动的最终相机位置（游动 / 追踪世界坐标）
+     * 解析被追踪演员（伪装）相对相机的方向，把相机 yaw / pitch 平滑转向演员——
+     * 位置不被修改（非完全锁定式跟踪），因此：
+     *   - 演员移动而相机不动（相机关键帧保持）：相机转头盯住演员，完成跟踪录制；
+     *   - 演员与相机同时移动（相机关键帧照常驱动）：相机在移动中时刻追踪演员，丝滑录制。
+     *
+     * smooth（0~1）控制跟随强度：1 完全盯住演员；0 保持关键帧朝向（等同关闭）；
+     * roll 不参与相位追踪；目标解析失败 / 未开启时完全不干预画面。
+     */
+    private void applyPhaseTracking(ClipContext context, float tick, String sel, String grp, Position position) {
+        PhaseFrameData data = this.phaseValueAt(tick);
+        if (data == null || !data.enabled || sel == null || sel.isEmpty()) {
+            return;
+        }
+        if (!(context instanceof CameraClipContext camera)) {
+            return;
+        }
+        IEntity entity = camera.entities.get(sel);
+        if (entity == null) {
+            return;
+        }
+        TrackerFrame frame = TrackerFrame.resolve(
+            camera.entities, entity, grp, position.point.x, position.point.y, position.point.z, context.transition
+        );
+        if (frame == null) {
+            return;
+        }
+        if (this.relative.get()) {
+            frame.relative(position, this.position);
+        }
+        Angle look = frame.lookAtAngles(this.offset.get(), this.angle.get());
+        float smooth = (float) Math.max(0.0D, Math.min(1.0D, data.smooth));
+        position.angle.yaw = lerpAngle(position.angle.yaw, look.yaw, smooth);
+        position.angle.pitch = lerpAngle(position.angle.pitch, look.pitch, smooth);
     }
 
     /**

@@ -31,6 +31,8 @@ public class BcpKeyframeFactories {
         PROPERTIES.put("yaw", (kf, ed) -> new UIAngleKeyframeFactory(kf, ed));
         PROPERTIES.put("pitch", (kf, ed) -> new UIAngleKeyframeFactory(kf, ed));
         PROPERTIES.put("roll", (kf, ed) -> new UIAngleKeyframeFactory(kf, ed));
+        // 相位追踪轴：每帧独立开关 + 朝向跟随强度（V1.6.1-Alpha）
+        PROPERTIES.put("phase", (kf, ed) -> new UIPhaseKeyframeFactory(kf, ed));
     }
 
     public static UIKeyframeFactory.IUIKeyframeFactoryFactory get(String name) {

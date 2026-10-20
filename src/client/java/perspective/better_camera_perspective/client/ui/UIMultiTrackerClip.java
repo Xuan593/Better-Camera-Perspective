@@ -39,6 +39,7 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
 import perspective.better_camera_perspective.data.XyzFrameData;
+import perspective.better_camera_perspective.data.PhaseFrameData;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -353,6 +354,8 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         this.appendReusedSheet("fov", this.clip.fov, titles, colors);
         this.appendReusedSheet("distance", this.clip.distance, titles, colors);
         this.appendSheet("anchor", L10n.lang("bbs.ui.camera.panels.axis_anchor"), 0xFF42A5F5, this.clip.anchor);
+        // 相位追踪轴（V1.6.1-Alpha）：每帧独立开关 + 朝向跟随强度
+        this.appendSheet("phase", L10n.lang("bbs.ui.camera.panels.axis_phase"), 0xAA66CC, this.clip.phase);
 
         // seed：帧级通道（XyzFrameData）+ 角度 / 视野（Double，无帧段时继承摄像机默认视角）
         for (UIKeyframeSheet sheet : this.keyframes.view.getGraph().getSheets()) {
@@ -370,6 +373,9 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
                 sheet.seed(() -> this.defaultSeedValue(5));
             } else if (sheet.channel == this.clip.fov) {
                 sheet.seed(() -> this.defaultSeedValue(6));
+            } else if (sheet.channel == this.clip.phase) {
+                // 相位追踪：默认关 + 默认跟随强度 0.9（播放端 clamp 0~1）
+                sheet.seed(() -> new PhaseFrameData());
             }
         }
     }

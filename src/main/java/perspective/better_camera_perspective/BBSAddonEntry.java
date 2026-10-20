@@ -14,6 +14,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import perspective.better_camera_perspective.clips.MultiTrackerClip;
 import perspective.better_camera_perspective.data.XyzFrameDataKeyframeFactory;
+import perspective.better_camera_perspective.data.PhaseFrameDataKeyframeFactory;
 
 /**
  * BBS 附加包服务端入口（fabric.mod.json 的 "bbs-addon" 字段）。
@@ -39,7 +40,9 @@ public class BBSAddonEntry implements BBSAddonMod {
     @Subscribe
     public void onRegisterKeyframeFactories(RegisterKeyframeFactoriesEvent event) {
         event.register(XyzFrameDataKeyframeFactory.TYPE, XyzFrameDataKeyframeFactory.INSTANCE);
-        LOGGER.info("[BCP] XyzFrameData 关键帧工厂已注册（type={}）", XyzFrameDataKeyframeFactory.TYPE);
+        event.register(PhaseFrameDataKeyframeFactory.TYPE, PhaseFrameDataKeyframeFactory.INSTANCE);
+        LOGGER.info("[BCP] XyzFrameData / PhaseFrameData 关键帧工厂已注册（type={} / {}）",
+            XyzFrameDataKeyframeFactory.TYPE, PhaseFrameDataKeyframeFactory.TYPE);
     }
 
     @Subscribe

@@ -10,6 +10,8 @@ import mchorse.bbs_mod.settings.values.numeric.ValueInt;
 import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.keyframes.KeyframeChannel;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
+import perspective.better_camera_perspective.data.PhaseFrameData;
+import perspective.better_camera_perspective.data.PhaseFrameDataKeyframeFactory;
 
 /**
  * 多样追踪（MultiTracker）——服务端剪辑类。
@@ -54,6 +56,15 @@ public class MultiTrackerClip extends KeyframeClip {
      */
     public final KeyframeChannel<Anchor> anchor = new KeyframeChannel<>("anchor", KeyframeFactories.ANCHOR);
 
+    /**
+     * 相位追踪轴（V1.6.1-Alpha）：每帧独立开关（默认关）+ 朝向跟随强度。
+     *
+     * 开启时，播放端读取当前关键帧驱动的摄像机位置与被追踪演员位置，
+     * 自动把摄像机朝向平滑转向演员（位置不被修改，非完全锁定式跟踪）。
+     * 值类型 {@link PhaseFrameData}（单独类属性，不污染 xd/yd/zd 四值存储）。
+     */
+    public final KeyframeChannel<PhaseFrameData> phase = new KeyframeChannel<>("phase", PhaseFrameDataKeyframeFactory.INSTANCE);
+
     public MultiTrackerClip() {
         this.add(this.selector);
         this.add(this.offset);
@@ -63,6 +74,7 @@ public class MultiTrackerClip extends KeyframeClip {
         this.add(this.relative);
         this.add(this.active);
         this.add(this.anchor);
+        this.add(this.phase);
     }
 
     @Override

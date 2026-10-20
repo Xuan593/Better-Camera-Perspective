@@ -1,6 +1,7 @@
 {
   "bbs.ui.camera.clips.bbs:multi_tracker": "多样追踪",
   "bbs.ui.camera.panels.axis_anchor": "锚点",
+  "bbs.ui.camera.panels.axis_phase": "相位追踪",
   "bbs.ui.camera.panels.xyz.relative": "相对值",
   "bbs.ui.camera.panels.xyz.absolute": "绝对值",
   "bbs.ui.camera.panels.xyz.inherit_relative": "将主继承相对值",
