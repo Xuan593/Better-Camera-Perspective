@@ -64,6 +64,8 @@ public class UIReplaysEditorMixin {
             }
             tracks.set(sheet.id, true);
         }
+        // V1.7.0：强制重新布局，避免展开后渲染缓存导致轨道堆叠
+        dope.resize();
         LOGGER.info("[BCP] expand replays: mode={} sheets={}", mode, sheets.size());
     }
 }
