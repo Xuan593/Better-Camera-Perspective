@@ -92,11 +92,11 @@ public class BBSClientAddonEntry implements BBSAddonMod {
         if (loader.isModLoaded("bbs_pov")) {
             LOGGER.info("[BCP] 检测到 BBS-POV 插件（Glaxium POV），剪辑与轨道已做兼容");
         }
-        if (loader.isModLoaded("bbs_lezy")) {
+        if (loader.isModLoaded("bbslezy")) {
             LOGGER.info("[BCP] 检测到 bbs-lezy 插件，剪辑与轨道已做兼容");
         }
-        if (loader.isModLoaded("bbs_cubed")) {
-            LOGGER.info("[BCP] 检测到 BBS-Cubed 插件，剪辑与轨道已做兼容");
+        if (loader.isModLoaded("bbsplusplus")) {
+            LOGGER.info("[BCP] 检测到 BBS-Cubed 插件（bbsplusplus），剪辑与轨道已做兼容");
         }
     }
 }
