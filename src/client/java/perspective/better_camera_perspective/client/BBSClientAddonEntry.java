@@ -15,6 +15,7 @@ import mchorse.bbs_mod.utils.clips.Clip;
 import mchorse.bbs_mod.utils.factory.MapFactory;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import perspective.better_camera_perspective.BBSAddonEntry;
@@ -63,6 +64,7 @@ public class BBSClientAddonEntry implements BBSAddonMod {
             BcpModeValueUi.register();
             BcpPastLogsModule.register();
             BcpConflictSettingsModule.register(event);
+            detectAddons();
         } catch (Exception e) {
             LOGGER.error("[BCP] 设置页注册异常", e);
         }
@@ -79,6 +81,22 @@ public class BBSClientAddonEntry implements BBSAddonMod {
             } catch (RuntimeException e) {
                 LOGGER.error("[BCP] 多样追踪语言文件加载失败", e);
             }
+        }
+    }
+
+    /**
+     * V1.7.3-Alpha：检测已安装的 BBS 附加插件，预防剪辑/轨道冲突。
+     */
+    private static void detectAddons() {
+        FabricLoader loader = FabricLoader.getInstance();
+        if (loader.isModLoaded("bbs_pov")) {
+            LOGGER.info("[BCP] 检测到 BBS-POV 插件（Glaxium POV），剪辑与轨道已做兼容");
+        }
+        if (loader.isModLoaded("bbs_lezy")) {
+            LOGGER.info("[BCP] 检测到 bbs-lezy 插件，剪辑与轨道已做兼容");
+        }
+        if (loader.isModLoaded("bbs_cubed")) {
+            LOGGER.info("[BCP] 检测到 BBS-Cubed 插件，剪辑与轨道已做兼容");
         }
     }
 }
