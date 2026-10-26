@@ -64,6 +64,9 @@ public class UIReplaysEditorMixin {
             }
             tracks.set(sheet.id, true);
         }
+        // V1.7.2：修改 tracks 后再次 setExpanded，触发 updateScrollSize 重算缓存，
+        // 否则 sheetYCache/sheetRowCache 还是按折叠状态算的 Y 位置，导致轨道堆叠
+        dope.setExpanded(tracks);
         LOGGER.info("[BCP] expand replays: mode={} sheets={}", mode, sheets.size());
     }
 }
