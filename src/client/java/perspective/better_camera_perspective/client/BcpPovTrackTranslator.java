@@ -265,6 +265,22 @@ public class BcpPovTrackTranslator {
         POV_CN.put("None", "无");
         POV_CN.put("Red Background", "红色背景");
         POV_CN.put("Ender Dragon", "末影龙");
+        // Boss Bar 属性面板
+        POV_CN.put("Boss: Ender Dragon", "Boss：末影龙");
+        POV_CN.put("Color: Pink", "颜色：粉色");
+        POV_CN.put("Style: Progress", "样式：进度条");
+        // Toast 属性面板
+        POV_CN.put("Advancement Made!", "进度达成！");
+        POV_CN.put("Diamonds!", "获得钻石！");
+        // GUI 类型选择弹窗
+        POV_CN.put("Inventory", "物品栏");
+        POV_CN.put("Creative Inventory", "创造模式物品栏");
+        POV_CN.put("Crafting Table", "合成台");
+        POV_CN.put("Smithing Table", "锻造台");
+        POV_CN.put("Grindstone", "砂轮");
+        POV_CN.put("Stonecutter", "切石机");
+        POV_CN.put("Player", "玩家");
+        POV_CN.put("Crafting", "合成");
     }
 
     /**
