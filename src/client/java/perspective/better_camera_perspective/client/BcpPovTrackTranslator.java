@@ -6,12 +6,10 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * V1.7.3-Alpha：POV 轨道名中文翻译表。
+ * V1.7.4-Alpha：POV 轨道名中文翻译表。
  *
  * 当 Cubed 的「中文关键帧轨道名称」开关打开时，
  * 将 POV 时间轴子页的轨道 id 翻译为中文。
- *
- * 翻译表：轨道 id（英文） → 中文显示名
  */
 public class BcpPovTrackTranslator {
 
@@ -19,31 +17,89 @@ public class BcpPovTrackTranslator {
     private static Boolean cubedChineseNamesEnabled = null;
 
     static {
-        // POV Action 子页（PovActionType）
-        POV_CN.put("gui", "GUI界面");
-        POV_CN.put("menu", "菜单");
-        POV_CN.put("camera_shake", "相机震动");
-        POV_CN.put("particle_effect", "粒子效果");
-        POV_CN.put("boss_bars", "Boss血条");
-        POV_CN.put("status_effects", "状态效果");
-        POV_CN.put("toasts", "弹窗通知");
-        POV_CN.put("chat", "聊天栏");
-        POV_CN.put("screen_effect", "屏幕特效");
+        // ===== hotbar 子页 =====
+        POV_CN.put("hotbar_layout", "快捷栏布局");
+        POV_CN.put("hotbar_slots_layout", "快捷栏槽位布局");
+        POV_CN.put("hotbar_hearts_layout", "生命值布局");
+        POV_CN.put("hotbar_food_layout", "饥饿值布局");
+        POV_CN.put("hotbar_exp_layout", "经验条布局");
+        POV_CN.put("hotbar_visible", "快捷栏可见");
+        POV_CN.put("hotbar_status_bars_visible", "状态条可见");
+        POV_CN.put("hotbar_crosshair", "准星");
+        POV_CN.put("hotbar_cursor_layout", "光标布局");
+        POV_CN.put("hotbar_cursor_visible", "光标可见");
+        POV_CN.put("hotbar_cursor_item", "光标物品");
+        POV_CN.put("selected_slot", "选中槽位");
+        POV_CN.put("item_slot_0", "槽位 0");
+        POV_CN.put("item_slot_1", "槽位 1");
+        POV_CN.put("item_slot_2", "槽位 2");
+        POV_CN.put("item_slot_3", "槽位 3");
+        POV_CN.put("item_slot_4", "槽位 4");
+        POV_CN.put("item_slot_5", "槽位 5");
+        POV_CN.put("item_slot_6", "槽位 6");
+        POV_CN.put("item_slot_7", "槽位 7");
+        POV_CN.put("item_slot_8", "槽位 8");
+        POV_CN.put("hotbar_inventory_slots", "背包槽位");
+        POV_CN.put("item_off_hand", "副手物品");
+        POV_CN.put("hotbar_health", "生命值");
+        POV_CN.put("hotbar_previous_health", "上一帧生命值");
+        POV_CN.put("hotbar_heart_flash", "心跳闪烁");
+        POV_CN.put("hotbar_health_container", "生命值容器");
+        POV_CN.put("hotbar_absorption", "伤害吸收");
+        POV_CN.put("hotbar_absorption_container", "伤害吸收容器");
+        POV_CN.put("hotbar_heart_type", "心形类型");
+        POV_CN.put("hotbar_hardcore", "极限模式");
+        POV_CN.put("hotbar_regeneration", "生命恢复");
+        POV_CN.put("hotbar_armor", "护甲值");
+        POV_CN.put("hotbar_hunger", "饥饿值");
+        POV_CN.put("hotbar_hunger_effect", "饥饿效果");
+        POV_CN.put("hotbar_mount_health", "坐骑生命值");
+        POV_CN.put("hotbar_mount_health_container", "坐骑生命值容器");
+        POV_CN.put("hotbar_air", "气泡值");
+        POV_CN.put("hotbar_experience", "经验值");
+        POV_CN.put("hotbar_experience_level", "经验等级");
+        POV_CN.put("hotbar_absorption_flash", "吸收闪烁");
 
-        // hotbar 子页（待补充）
-        // POV_CN.put("hotbar_selected", "快捷栏选中槽");
-        // POV_CN.put("hotbar_item", "快捷栏物品");
-        // POV_CN.put("hotbar_transform", "快捷栏变换");
+        // ===== Hand 子页 =====
+        POV_CN.put("pov_hand_visible", "手部可见");
+        POV_CN.put("pov_hand_model", "手部模型");
+        POV_CN.put("pov_hand_texture", "手部纹理");
+        POV_CN.put("pov_hand_color", "手部颜色");
+        POV_CN.put("pov_hand_color_overlay", "手部颜色叠加");
+        POV_CN.put("pov_hand_camera_offset", "手相机偏移");
+        POV_CN.put("pov_hand_pose", "手部姿势");
+        POV_CN.put("pov_hand_item_pose", "手部物品姿势");
+        POV_CN.put("pov_hand_world_interaction", "手部世界交互");
+        POV_CN.put("pov_hand_replay_interaction", "手部回放交互");
+        POV_CN.put("pov_hand_right_hand_visible", "右手可见");
+        POV_CN.put("pov_hand_left_hand_visible", "左手可见");
+        POV_CN.put("pov_hand_right_swing_progress", "右手挥动进度");
+        POV_CN.put("pov_hand_left_swing_progress", "左手挥动进度");
+        POV_CN.put("pov_hand_main_equip", "主手装备");
+        POV_CN.put("pov_hand_off_equip", "副手装备");
+        POV_CN.put("pov_hand_active_hand", "当前手");
+        POV_CN.put("pov_hand_active_item", "当前物品");
+        POV_CN.put("pov_hand_show_use_particles", "使用粒子显示");
+        POV_CN.put("pov_hand_use_time", "使用时间");
+        POV_CN.put("pov_hand_bob_phase", "摆动相位");
+        POV_CN.put("pov_hand_bob_strength", "摆动力度");
+        POV_CN.put("pov_hand_render_yaw", "渲染偏航角");
+        POV_CN.put("pov_hand_render_pitch", "渲染俯仰角");
+        POV_CN.put("pov_hand_main_arm", "主手臂");
 
-        // Hand 子页（待补充）
-        // POV_CN.put("hand_x", "手部X");
-        // POV_CN.put("hand_y", "手部Y");
-        // POV_CN.put("hand_z", "手部Z");
+        // ===== POV Action 子页 =====
+        POV_CN.put("actions", "POV动作");
+        POV_CN.put("actions_overlay", "动作叠加");
+        POV_CN.put("actions_overlay0", "动作叠加 0");
+        POV_CN.put("actions_overlay1", "动作叠加 1");
+        POV_CN.put("actions_overlay2", "动作叠加 2");
+        POV_CN.put("actions_overlay3", "动作叠加 3");
+        POV_CN.put("actions_overlay4", "动作叠加 4");
+        POV_CN.put("actions_overlay5", "动作叠加 5");
     }
 
     /**
      * 检查 Cubed 的「中文关键帧轨道名称」开关是否打开。
-     * 通过反射访问 gbeic.bbsplusplus.settings.ModSettings.chineseKeyframeNames。
      */
     public static boolean isCubedChineseNamesEnabled() {
         if (cubedChineseNamesEnabled != null) {
@@ -56,7 +112,6 @@ public class BcpPovTrackTranslator {
             }
             Class<?> modSettings = Class.forName("gbeic.bbsplusplus.settings.ModSettings");
             Object value = modSettings.getField("chineseKeyframeNames").get(null);
-            // ValueBoolean 继承自 ValueBase，get() 返回 Boolean
             cubedChineseNamesEnabled = (Boolean) value.getClass().getMethod("get").invoke(value);
             return cubedChineseNamesEnabled;
         } catch (Exception e) {
@@ -67,8 +122,6 @@ public class BcpPovTrackTranslator {
 
     /**
      * 翻译轨道 id。
-     * @param id 轨道 id（英文）
-     * @return 中文显示名，如果没有匹配返回 null
      */
     public static String translate(String id) {
         if (id == null) {
@@ -78,7 +131,7 @@ public class BcpPovTrackTranslator {
     }
 
     /**
-     * 清除缓存（设置切换时调用）。
+     * 清除缓存。
      */
     public static void clearCache() {
         cubedChineseNamesEnabled = null;

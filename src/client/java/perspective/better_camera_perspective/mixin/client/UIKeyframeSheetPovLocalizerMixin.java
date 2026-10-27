@@ -10,17 +10,11 @@ import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import perspective.better_camera_perspective.client.BcpPovTrackTranslator;
 
-import java.util.HashMap;
-import java.util.Map;
-
 /**
- * V1.7.3-Alpha：POV 轨道名中文翻译补丁。
+ * V1.7.4-Alpha：POV 轨道名中文翻译补丁。
  *
  * 当 Cubed 的「中文关键帧轨道名称」开关打开时，自动将 POV 时间轴子页
  * （hotbar、Hand、POV Action）的轨道名翻译为中文。
- *
- * 机制：hook UIKeyframeSheet.applyStyle()，在 Cubed 自己的翻译之后，
- * 检查当前 sheet.id 是否在 POV 翻译表里，如果是就替换 title。
  */
 @Environment(EnvType.CLIENT)
 @Mixin(UIKeyframeSheet.class)
