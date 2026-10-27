@@ -2,19 +2,26 @@ package perspective.better_camera_perspective.client;
 
 import net.fabricmc.loader.api.FabricLoader;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * V1.7.4-Alpha：POV 轨道名中文翻译表。
+ * V1.7.5-Alpha：POV 轨道名中文翻译表。
  *
  * 当 Cubed 的「中文关键帧轨道名称」开关打开时，
  * 将 POV 时间轴子页的轨道 id 翻译为中文。
+ *
+ * 预防性逻辑：先调 Cubed 的 KeyframeLocalizer.localize()，
+ * 如果 Cubed 已翻译（返回非 null）就用 Cubed 的，
+ * 只有 Cubed 没覆盖到的才用我们的翻译表。
  */
 public class BcpPovTrackTranslator {
 
     private static final Map<String, String> POV_CN = new HashMap<>();
     private static Boolean cubedChineseNamesEnabled = null;
+    private static Method cubedLocalizeMethod = null;
+    private static boolean cubedLocalizeResolved = false;
 
     static {
         // ===== hotbar 子页 =====
@@ -96,6 +103,17 @@ public class BcpPovTrackTranslator {
         POV_CN.put("actions_overlay3", "动作叠加 3");
         POV_CN.put("actions_overlay4", "动作叠加 4");
         POV_CN.put("actions_overlay5", "动作叠加 5");
+
+        // ===== POV Action 右键菜单（9个action类型）=====
+        POV_CN.put("gui", "GUI界面");
+        POV_CN.put("menu", "菜单");
+        POV_CN.put("camera_shake", "相机震动");
+        POV_CN.put("particle_effect", "粒子效果");
+        POV_CN.put("boss_bars", "Boss血条");
+        POV_CN.put("status_effects", "状态效果");
+        POV_CN.put("toasts", "弹窗通知");
+        POV_CN.put("chat", "聊天栏");
+        POV_CN.put("screen_effect", "屏幕特效");
     }
 
     /**
@@ -121,12 +139,42 @@ public class BcpPovTrackTranslator {
     }
 
     /**
+     * 尝试调用 Cubed 的 KeyframeLocalizer.localize(id)。
+     * 如果 Cubed 已翻译，返回翻译结果；否则返回 null。
+     */
+    private static String cubedLocalize(String id) {
+        if (!FabricLoader.getInstance().isModLoaded("bbsplusplus")) {
+            return null;
+        }
+        try {
+            if (!cubedLocalizeResolved) {
+                Class<?> localizer = Class.forName("gbeic.bbsplusplus.KeyframeLocalizer");
+                cubedLocalizeMethod = localizer.getMethod("localize", String.class);
+                cubedLocalizeResolved = true;
+            }
+            if (cubedLocalizeMethod == null) {
+                return null;
+            }
+            return (String) cubedLocalizeMethod.invoke(null, id);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
      * 翻译轨道 id。
+     * 优先用 Cubed 的翻译，如果 Cubed 没覆盖到才用我们的表。
      */
     public static String translate(String id) {
         if (id == null) {
             return null;
         }
+        // 预防性补丁：先问 Cubed 有没有翻译
+        String cubedResult = cubedLocalize(id);
+        if (cubedResult != null && !cubedResult.equals(id)) {
+            return cubedResult; // Cubed 已覆盖，以 Cubed 为主
+        }
+        // Cubed 没翻译，用我们的表
         return POV_CN.get(id);
     }
 
