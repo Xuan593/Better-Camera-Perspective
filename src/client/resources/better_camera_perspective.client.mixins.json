@@ -13,7 +13,8 @@
     "UIReplaysEditorMixin",
     "UIClipsAddClipMixin",
     "UIClipsLayerHeightMixin",
-    "UISettingsOverlayPanelMixin"
+    "UISettingsOverlayPanelMixin",
+    "UIKeyframeSheetPovLocalizerMixin"
   ],
   "injectors": {
     "defaultRequire": 1
