@@ -14,7 +14,8 @@
     "UIClipsAddClipMixin",
     "UIClipsLayerHeightMixin",
     "UISettingsOverlayPanelMixin",
-    "UIKeyframeSheetPovLocalizerMixin"
+    "UIKeyframeSheetPovLocalizerMixin",
+    "UIClipsPovDisplayNameMixin"
   ],
   "injectors": {
     "defaultRequire": 1
