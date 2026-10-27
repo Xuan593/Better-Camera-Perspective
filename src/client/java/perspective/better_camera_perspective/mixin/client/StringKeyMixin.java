@@ -20,7 +20,8 @@ public abstract class StringKeyMixin {
         }
         // 只翻译翻译表里有的字符串
         String translated = BcpPovTrackTranslator.translate(original);
-        if (!original.equals(translated)) {
+        // 如果 translated 是 null 或者和 original 一样，就不修改
+        if (translated != null && !original.equals(translated)) {
             System.out.println("[BCP-PovDisplay] StringKey.get: " + original + " -> " + translated);
             cir.setReturnValue(translated);
         }
