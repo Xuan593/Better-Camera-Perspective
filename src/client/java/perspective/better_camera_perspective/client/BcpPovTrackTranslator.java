@@ -281,6 +281,9 @@ public class BcpPovTrackTranslator {
         POV_CN.put("Stonecutter", "切石机");
         POV_CN.put("Player", "玩家");
         POV_CN.put("Crafting", "合成");
+        // 菜单/GUI 设置按钮
+        POV_CN.put("Menu: Sleep", "菜单：睡觉");
+        POV_CN.put("GUI: Inventory", "GUI：物品栏");
     }
 
     /**
