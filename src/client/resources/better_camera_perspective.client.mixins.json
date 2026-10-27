@@ -15,7 +15,8 @@
     "UIClipsLayerHeightMixin",
     "UISettingsOverlayPanelMixin",
     "UIKeyframeSheetPovLocalizerMixin",
-    "UIClipsPovDisplayNameMixin"
+    "UIClipsPovDisplayNameMixin",
+    "StringKeyMixin"
   ],
   "injectors": {
     "defaultRequire": 1
