@@ -105,15 +105,16 @@ public class BcpPovTrackTranslator {
         POV_CN.put("actions_overlay5", "动作叠加 5");
 
         // ===== POV Action 右键菜单（9个action类型）=====
-        POV_CN.put("gui", "GUI界面");
-        POV_CN.put("menu", "菜单");
-        POV_CN.put("camera_shake", "相机震动");
-        POV_CN.put("particle_effect", "粒子效果");
-        POV_CN.put("boss_bars", "Boss血条");
-        POV_CN.put("status_effects", "状态效果");
-        POV_CN.put("toasts", "弹窗通知");
-        POV_CN.put("chat", "聊天栏");
-        POV_CN.put("screen_effect", "屏幕特效");
+        // 注意：key 是实际传入的 original 格式（大写/带空格），不是小写id
+        POV_CN.put("GUI", "GUI界面");
+        POV_CN.put("Menu", "菜单");
+        POV_CN.put("Camera Shake", "相机震动");
+        POV_CN.put("Particle Effect", "粒子效果");
+        POV_CN.put("Boss Bars", "Boss血条");
+        POV_CN.put("Status Effects", "状态效果");
+        POV_CN.put("Toasts", "弹窗通知");
+        POV_CN.put("Chat", "聊天栏");
+        POV_CN.put("Screen Effect", "屏幕特效");
     }
 
     /**
