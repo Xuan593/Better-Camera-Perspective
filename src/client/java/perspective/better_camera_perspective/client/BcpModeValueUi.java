@@ -57,7 +57,7 @@ public class BcpModeValueUi {
                             btnList.get(j).color(j == idx ? STATUS_COLOR : NORMAL_COLOR);
                         }
                     });
-                    btn.relative(buttons).w(58).h(20);
+                    btn.relative(buttons).w(87).h(20);
                     buttons.add(btn);
                     btnList.add(btn);
                 }
