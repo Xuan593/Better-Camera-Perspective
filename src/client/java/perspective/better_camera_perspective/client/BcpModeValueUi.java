@@ -33,6 +33,15 @@ public class BcpModeValueUi {
     private static final Logger LOGGER = LoggerFactory.getLogger("better_camera_perspective_client");
     private static boolean registered = false;
 
+    /** 从设置读取按钮宽度（默认 87px） */
+    private static int getButtonWidth() {
+        try {
+            return BcpClipProcessing.getButtonWidth();
+        } catch (Exception e) {
+            return 87;
+        }
+    }
+
     public static void register() {
         if (registered) return;
         try {
@@ -57,7 +66,13 @@ public class BcpModeValueUi {
                             btnList.get(j).color(j == idx ? STATUS_COLOR : NORMAL_COLOR);
                         }
                     });
-                    btn.relative(buttons).w(87).h(20);
+                    // 悬浮提示暂未适配（BBS tooltip 需 IKey 类型，后续再补）
+                    // String tooltipKey = value.getLabelPrefix() + "." + modes.get(i) + ".tooltip";
+                    // String tooltipText = L10n.lang(tooltipKey);
+                    // if (!tooltipText.equals(tooltipKey)) {
+                    //     btn.tooltip(tooltipText);
+                    // }
+                    btn.relative(buttons).w(getButtonWidth()).h(20);
                     buttons.add(btn);
                     btnList.add(btn);
                 }

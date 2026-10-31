@@ -25,22 +25,33 @@ import java.util.List;
 public class BcpClipProcessing {
     public static final String KEY_CLIP_MENU_LAYOUT = "clip_menu_layout";
     public static final String KEY_VISIBILITY_LAYOUT = "visibility_layout";
+    public static final String KEY_BUTTON_SIZE = "button_size";
 
     public static final String LAYOUT_ORIGINAL = "original";
     public static final String LAYOUT_OVERRIDE = "override";
     public static final String LAYOUT_DYNAMIC = "dynamic";
     public static final String LAYOUT_STATIC = "static";
 
+    public static final String BTN_SIZE_DEFAULT = "default";
+    public static final String BTN_SIZE_DYNAMIC = "dynamic";
+    public static final String BTN_SIZE_CUSTOM = "custom";
+
     public static final int LAYOUT_ORIGINAL_IDX = 0;
     public static final int LAYOUT_OVERRIDE_IDX = 1;
     public static final int LAYOUT_DYNAMIC_IDX = 0;
     public static final int LAYOUT_STATIC_IDX = 1;
 
+    public static final int BTN_SIZE_DEFAULT_IDX = 0;
+    public static final int BTN_SIZE_DYNAMIC_IDX = 1;
+    public static final int BTN_SIZE_CUSTOM_IDX = 2;
+
     private static final Logger LOGGER = LoggerFactory.getLogger("better_camera_perspective_client");
     private static final String MENU_LABEL_PREFIX = "conflict_features.config.clip_processing.clip_menu_layout";
     private static final String VISIBILITY_LABEL_PREFIX = "conflict_features.config.clip_processing.visibility_layout";
+    private static final String BUTTON_SIZE_LABEL_PREFIX = "conflict_features.config.clip_processing.button_size";
     private static BcpModeValue layoutValue;
     private static BcpModeValue visibilityValue;
+    private static BcpModeValue buttonSizeValue;
     private static boolean registered = false;
 
     public static void registerValues(SettingsBuilder builder) {
@@ -53,6 +64,9 @@ public class BcpClipProcessing {
             visibilityValue = new BcpModeValue(KEY_VISIBILITY_LAYOUT, LAYOUT_DYNAMIC,
                 List.of(LAYOUT_DYNAMIC, LAYOUT_STATIC), VISIBILITY_LABEL_PREFIX);
             builder.register(visibilityValue);
+            buttonSizeValue = new BcpModeValue(KEY_BUTTON_SIZE, BTN_SIZE_DEFAULT,
+                List.of(BTN_SIZE_DEFAULT, BTN_SIZE_DYNAMIC, BTN_SIZE_CUSTOM), BUTTON_SIZE_LABEL_PREFIX);
+            builder.register(buttonSizeValue);
             registered = true;
         } catch (Exception e) {
             LOGGER.error("[BCP] 设置页「可视化设置」注册失败", e);
@@ -78,6 +92,19 @@ public class BcpClipProcessing {
                 return LAYOUT_STATIC_IDX;
             default:
                 return LAYOUT_DYNAMIC_IDX;
+        }
+    }
+
+    /** 获取设置页按钮宽度（px）：default=87, dynamic=按文本, custom=120 */
+    public static int getButtonWidth() {
+        if (buttonSizeValue == null) return 87;
+        switch (buttonSizeValue.get()) {
+            case BTN_SIZE_DYNAMIC:
+                return -1; // 动态自适应（暂未实现，先返回默认）
+            case BTN_SIZE_CUSTOM:
+                return 120; // 手动模式暂用固定值，后续加文本框
+            default:
+                return 87; // 默认
         }
     }
 }
