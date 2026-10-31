@@ -65,7 +65,7 @@ public class BcpClipProcessing {
                 List.of(LAYOUT_DYNAMIC, LAYOUT_STATIC), VISIBILITY_LABEL_PREFIX);
             builder.register(visibilityValue);
             buttonSizeValue = new BcpModeValue(KEY_BUTTON_SIZE, BTN_SIZE_DEFAULT,
-                List.of(BTN_SIZE_DEFAULT, BTN_SIZE_DYNAMIC, BTN_SIZE_CUSTOM), BUTTON_SIZE_LABEL_PREFIX);
+                List.of(BTN_SIZE_DEFAULT, BTN_SIZE_DYNAMIC), BUTTON_SIZE_LABEL_PREFIX);
             builder.register(buttonSizeValue);
             registered = true;
         } catch (Exception e) {
