@@ -311,8 +311,8 @@ public class BcpPovTrackTranslator {
     }
 
     /**
-     * 尝试调用 Cubed 的 KeyframeLocalizer.localize(id)。
-     * 如果 Cubed 已翻译，返回翻译结果；否则返回 null。
+     * 尝试调用第三方插件的 KeyframeLocalizer.localize(id)。
+     * 如果外部插件已翻译，返回翻译结果；否则返回 null。
      */
     private static String cubedLocalize(String id) {
         if (!FabricLoader.getInstance().isModLoaded("bbsplusplus")) {
@@ -323,14 +323,14 @@ public class BcpPovTrackTranslator {
                 Class<?> localizer = Class.forName("gbeic.bbsplusplus.KeyframeLocalizer");
                 cubedLocalizeMethod = localizer.getMethod("localize", String.class);
                 cubedLocalizeResolved = true;
-                LOGGER.info("[BCP-PovTranslator] Cubed KeyframeLocalizer 反射绑定成功");
+                LOGGER.info("[BCP-PovTranslator] 第三方 KeyframeLocalizer 反射绑定成功（bbsplusplus）");
             }
             if (cubedLocalizeMethod == null) {
                 return null;
             }
             return (String) cubedLocalizeMethod.invoke(null, id);
         } catch (Exception e) {
-            LOGGER.debug("[BCP-PovTranslator] Cubed localize 调用失败: {}", e.getMessage());
+            LOGGER.debug("[BCP-PovTranslator] 第三方 localize 调用失败: {}", e.getMessage());
             return null;
         }
     }
@@ -350,8 +350,8 @@ public class BcpPovTrackTranslator {
         if (!firstTranslateLogged) {
             String modeName = switch (mode) {
                 case BcpConflictDetection.POV_TRACK_BCP_FIRST_IDX -> "BCP优先";
-                case BcpConflictDetection.POV_TRACK_CUBED_WITH_BCP_IDX -> "Cubed为主，BCP辅助";
-                default -> "Cubed优先";
+                case BcpConflictDetection.POV_TRACK_CUBED_WITH_BCP_IDX -> "第三方为主，BCP辅助";
+                default -> "第三方优先";
             };
             LOGGER.info("[BCP-PovTranslator] 首次翻译调用，当前模式 = {}（id={}）", modeName, id);
             firstTranslateLogged = true;
