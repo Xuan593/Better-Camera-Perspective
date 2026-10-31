@@ -24,9 +24,13 @@ public class BcpConflictSettingsModule {
                 MODULE_ID,
                 new File(BBSMod.getSettingsFolder(), MODULE_ID + ".json"),
                 (builder) -> {
-                    // 最先注册「往期日志」子设置页（配合 UISettingsOverlayPanelMixin 锁定 1 号位）
+                    // 1号位：往期日志
                     BcpPastLogsModule.registerValues(builder);
+                    // 2号位：功能冲突检测
+                    BcpConflictDetection.registerValues(builder);
+                    // 3号位：可视化设置
                     BcpClipProcessing.registerValues(builder);
+                    // 4号位：关键帧处理设置
                     BcpKeyframeProcessing.registerValues(builder);
                 }
             );

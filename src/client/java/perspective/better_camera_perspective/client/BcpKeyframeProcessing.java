@@ -56,6 +56,7 @@ public class BcpKeyframeProcessing {
             expandValue = new BcpModeValue(KEY_EXPAND, EXPAND_DEFAULT,
                 List.of(EXPAND_DEFAULT, EXPAND_ORIGINAL), EXPAND_LABEL_PREFIX);
             builder.register(expandValue);
+
             registered = true;
         } catch (Exception e) {
             LOGGER.error("[BCP] 设置页「关键帧处理设置」注册失败", e);

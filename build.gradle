@@ -48,6 +48,9 @@ dependencies {
     // 注意：BBS jar 为 intermediary 映射，必须用 modImplementation 交给 Loom remap，
     // 不能使用 compileOnly（会导致映射错位）
     modImplementation files("libs/bbs-2.7-1.20.1.jar")
+
+    // LumenCore（灯光插件，V1.7.14-Alpha 灯光 alpha 补丁用）
+    modImplementation files("Addon/LumenCore-3.5-fix.jar")
 }
 
 processResources {
