@@ -23,9 +23,7 @@ public abstract class UIKeyframeSheetPovLocalizerMixin {
     @Inject(method = "applyStyle", at = @At("TAIL"))
     private void bcp$localizePovTrackNames(CallbackInfo ci) {
         UIKeyframeSheet self = (UIKeyframeSheet) (Object) this;
-        if (!BcpPovTrackTranslator.isCubedChineseNamesEnabled()) {
-            return;
-        }
+        // 由 BcpConflictDetection 设置接管优先级控制，不再依赖 Cubed 开关
         String translated = BcpPovTrackTranslator.translate(self.id);
         if (translated != null && !translated.equals(self.id)) {
             self.title = IKey.constant(translated);

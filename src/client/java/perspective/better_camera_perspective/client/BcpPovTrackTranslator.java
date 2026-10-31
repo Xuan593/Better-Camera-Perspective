@@ -333,19 +333,36 @@ public class BcpPovTrackTranslator {
 
     /**
      * 翻译轨道 id。
-     * 优先用 Cubed 的翻译，如果 Cubed 没覆盖到才用我们的表。
+     * 根据 BcpConflictDetection 设置决定优先级：
+     * - 0 (Cubed优先)：完全用 Cubed 翻译，BCP 表不介入
+     * - 1 (BCP优先)：完全用 BCP 表，不调 Cubed
+     * - 2 (Cubed为主，BCP辅助)：先 Cubed，Cubed 没覆盖的用 BCP 补充
      */
     public static String translate(String id) {
         if (id == null) {
             return null;
         }
-        // 预防性补丁：先问 Cubed 有没有翻译
-        String cubedResult = cubedLocalize(id);
-        if (cubedResult != null && !cubedResult.equals(id)) {
-            return cubedResult; // Cubed 已覆盖，以 Cubed 为主
+        int mode = BcpConflictDetection.getPovTrackMode();
+        switch (mode) {
+            case BcpConflictDetection.POV_TRACK_BCP_FIRST_IDX:
+                // BCP优先：直接查 BCP 表
+                return POV_CN.get(id);
+            case BcpConflictDetection.POV_TRACK_CUBED_FIRST_IDX:
+                // Cubed优先：只调 Cubed，Cubed 没翻译就返回原文
+                String cubedOnly = cubedLocalize(id);
+                if (cubedOnly != null && !cubedOnly.equals(id)) {
+                    return cubedOnly;
+                }
+                return id; // 保持英文
+            case BcpConflictDetection.POV_TRACK_CUBED_WITH_BCP_IDX:
+            default:
+                // Cubed为主，BCP辅助：先 Cubed，没覆盖的用 BCP 补充
+                String cubedResult = cubedLocalize(id);
+                if (cubedResult != null && !cubedResult.equals(id)) {
+                    return cubedResult;
+                }
+                return POV_CN.get(id);
         }
-        // Cubed 没翻译，用我们的表
-        return POV_CN.get(id);
     }
 
     /**
