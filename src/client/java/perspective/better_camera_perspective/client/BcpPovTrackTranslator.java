@@ -1,27 +1,27 @@
 package perspective.better_camera_perspective.client;
 
 import net.fabricmc.loader.api.FabricLoader;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * V1.7.5-Alpha：POV 轨道名中文翻译表。
+ * POV 轨道名中文翻译表。
  *
- * 当 Cubed 的「中文关键帧轨道名称」开关打开时，
- * 将 POV 时间轴子页的轨道 id 翻译为中文。
- *
- * 预防性逻辑：先调 Cubed 的 KeyframeLocalizer.localize()，
- * 如果 Cubed 已翻译（返回非 null）就用 Cubed 的，
- * 只有 Cubed 没覆盖到的才用我们的翻译表。
+ * 根据 BcpConflictDetection 设置决定翻译优先级：
+ * Cubed优先 / BCP优先 / Cubed为主BCP辅助
  */
 public class BcpPovTrackTranslator {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger("BCP-PovTranslator");
     private static final Map<String, String> POV_CN = new HashMap<>();
     private static Boolean cubedChineseNamesEnabled = null;
     private static Method cubedLocalizeMethod = null;
     private static boolean cubedLocalizeResolved = false;
+    private static boolean firstTranslateLogged = false;
 
     static {
         // ===== hotbar 子页 =====
@@ -284,6 +284,8 @@ public class BcpPovTrackTranslator {
         // 菜单/GUI 设置按钮
         POV_CN.put("Menu: Sleep", "菜单：睡觉");
         POV_CN.put("GUI: Inventory", "GUI：物品栏");
+
+        LOGGER.info("[BCP-PovTranslator] 翻译表初始化完成，共 {} 条条目", POV_CN.size());
     }
 
     /**
@@ -321,12 +323,14 @@ public class BcpPovTrackTranslator {
                 Class<?> localizer = Class.forName("gbeic.bbsplusplus.KeyframeLocalizer");
                 cubedLocalizeMethod = localizer.getMethod("localize", String.class);
                 cubedLocalizeResolved = true;
+                LOGGER.info("[BCP-PovTranslator] Cubed KeyframeLocalizer 反射绑定成功");
             }
             if (cubedLocalizeMethod == null) {
                 return null;
             }
             return (String) cubedLocalizeMethod.invoke(null, id);
         } catch (Exception e) {
+            LOGGER.debug("[BCP-PovTranslator] Cubed localize 调用失败: {}", e.getMessage());
             return null;
         }
     }
@@ -343,6 +347,15 @@ public class BcpPovTrackTranslator {
             return null;
         }
         int mode = BcpConflictDetection.getPovTrackMode();
+        if (!firstTranslateLogged) {
+            String modeName = switch (mode) {
+                case BcpConflictDetection.POV_TRACK_BCP_FIRST_IDX -> "BCP优先";
+                case BcpConflictDetection.POV_TRACK_CUBED_WITH_BCP_IDX -> "Cubed为主，BCP辅助";
+                default -> "Cubed优先";
+            };
+            LOGGER.info("[BCP-PovTranslator] 首次翻译调用，当前模式 = {}（id={}）", modeName, id);
+            firstTranslateLogged = true;
+        }
         switch (mode) {
             case BcpConflictDetection.POV_TRACK_BCP_FIRST_IDX:
                 // BCP优先：直接查 BCP 表
