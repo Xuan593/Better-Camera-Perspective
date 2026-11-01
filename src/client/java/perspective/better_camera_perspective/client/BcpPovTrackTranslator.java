@@ -394,6 +394,26 @@ public class BcpPovTrackTranslator {
         POV_CN.put("Style: Notched 12", "样式：分段 12");
         POV_CN.put("Style: Notched 20", "样式：分段 20");
 
+        // ===== 屏幕特效列表效果名 =====
+        POV_CN.put("Vignette", "暗角");
+        POV_CN.put("Blindness", "失明");
+        POV_CN.put("Darkness", "黑暗");
+        POV_CN.put("Fire", "火焰");
+        POV_CN.put("Underwater", "水下");
+        POV_CN.put("Powder Snow Frost", "细雪霜冻");
+        POV_CN.put("Nether Portal", "下界传送门");
+        POV_CN.put("In-Wall Suffocation", "墙内窒息");
+        POV_CN.put("Pumpkin Blur", "南瓜模糊");
+        POV_CN.put("Nausea Distortion", "反胃扭曲");
+        POV_CN.put("Totem of Undying", "不死图腾");
+        POV_CN.put("Spyglass Scope", "望远镜视野");
+
+        // ===== Boss 血条补充 =====
+        POV_CN.put("Boss: Wither", "Boss：凋灵");
+
+        // ===== POV 编辑器按钮 =====
+        POV_CN.put("Open POV Editor", "打开 POV 编辑器");
+
         LOGGER.info("[BCP-PovTranslator] 翻译表初始化完成，共 {} 条条目", POV_CN.size());
     }
 
