@@ -18,6 +18,7 @@ public class BcpPovTrackTranslator {
 
     private static final Logger LOGGER = LoggerFactory.getLogger("BCP-PovTranslator");
     private static final Map<String, String> POV_CN = new HashMap<>();
+    private static final java.util.Set<String> UNTRANSLATED_LOGGED = new java.util.HashSet<>();
     private static Boolean cubedChineseNamesEnabled = null;
     private static Method cubedLocalizeMethod = null;
     private static boolean cubedLocalizeResolved = false;
@@ -285,6 +286,16 @@ public class BcpPovTrackTranslator {
         POV_CN.put("Menu: Sleep", "菜单：睡觉");
         POV_CN.put("GUI: Inventory", "GUI：物品栏");
 
+        // ===== 其他 mod 自定义状态效果 =====
+        POV_CN.put("Satisfaction", "满足");
+        POV_CN.put("Sweet Heart", "甜心");
+        POV_CN.put("Tipsy", "微醺");
+        POV_CN.put("No WM Cave Maps", "洞穴地图不可用");
+        POV_CN.put("No World Map", "世界地图不可用");
+        POV_CN.put("实体雷达不可用", "实体雷达不可用");
+        POV_CN.put("小地图不可用", "小地图不可用");
+        POV_CN.put("路径点不可用", "路径点不可用");
+
         LOGGER.info("[BCP-PovTranslator] 翻译表初始化完成，共 {} 条条目", POV_CN.size());
     }
 
@@ -359,7 +370,11 @@ public class BcpPovTrackTranslator {
         switch (mode) {
             case BcpConflictDetection.POV_TRACK_BCP_FIRST_IDX:
                 // BCP优先：直接查 BCP 表
-                return POV_CN.get(id);
+                String bcpResult = POV_CN.get(id);
+                if (bcpResult == null && UNTRANSLATED_LOGGED.add(id)) {
+                    LOGGER.debug("[BCP-PovTranslator] 未翻译字符串: {}", id);
+                }
+                return bcpResult;
             case BcpConflictDetection.POV_TRACK_CUBED_FIRST_IDX:
                 // Cubed优先：只调 Cubed，Cubed 没翻译就返回原文
                 String cubedOnly = cubedLocalize(id);

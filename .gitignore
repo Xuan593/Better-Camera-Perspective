@@ -25,3 +25,6 @@ Addon/
 
 # 临时反编译目录（调试用，不入库）
 .tmp_cubed363/
+
+.tmp_bbsae/
+.tmp_pov/
