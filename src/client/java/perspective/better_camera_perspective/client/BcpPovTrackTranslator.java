@@ -296,6 +296,76 @@ public class BcpPovTrackTranslator {
         POV_CN.put("小地图不可用", "小地图不可用");
         POV_CN.put("路径点不可用", "路径点不可用");
 
+        // ===== GUI 类型列表（GUI Type 弹窗选项）=====
+        POV_CN.put("Chest (Large 9x6)", "大箱子（9x6）");
+        POV_CN.put("Chest (Small 9x3)", "小箱子（9x3）");
+        POV_CN.put("Large Chest", "大箱子");
+        POV_CN.put("Donkey Inventory", "驴物品栏");
+        POV_CN.put("Horse Inventory", "马物品栏");
+        POV_CN.put("Gamemode Switcher", "游戏模式切换器");
+        POV_CN.put("Repair & Disenchant", "修复与卸魔");
+        POV_CN.put("Repair & Name", "修复与命名");
+        POV_CN.put("Enchant", "附魔");
+        POV_CN.put("Enchanting", "附魔台");
+        POV_CN.put("Enchanting Table", "附魔台");
+        POV_CN.put("Brewing", "酿造");
+        POV_CN.put("Brewing Stand", "酿造台");
+        POV_CN.put("Cartography Table", "制图台");
+        POV_CN.put("Loom", "织布机");
+        POV_CN.put("Blast Furnace", "高炉");
+        POV_CN.put("Smoker", "烟熏炉");
+        POV_CN.put("Dropper", "投掷器");
+        POV_CN.put("Dispenser", "发射器");
+        POV_CN.put("Hopper", "漏斗");
+        POV_CN.put("Item Hopper", "物品漏斗");
+        POV_CN.put("Shulker Box", "潜影盒");
+        POV_CN.put("Ender Chest", "末影箱");
+        POV_CN.put("Barrel", "木桶");
+        POV_CN.put("Merchant", "商人");
+        POV_CN.put("Villager Trading", "村民交易");
+        POV_CN.put("Trading", "交易");
+        POV_CN.put("Containers", "容器");
+        POV_CN.put("Entities", "实体");
+        POV_CN.put("Redstone", "红石");
+        POV_CN.put("Special", "特殊");
+        POV_CN.put("Progress", "进度");
+
+        // ===== 面板提示文本 =====
+        POV_CN.put("Right-click to add effects", "右键添加效果");
+        POV_CN.put("Right-click to add screen effects", "右键添加屏幕特效");
+
+        // ===== Toast 类型与预设名 =====
+        POV_CN.put("Advancements", "进度");
+        POV_CN.put("Recipes", "配方");
+        POV_CN.put("Tutorials", "教程");
+        POV_CN.put("Tutorial", "教程");
+        POV_CN.put("System", "系统");
+        POV_CN.put("Challenge Complete!", "挑战完成！");
+        POV_CN.put("Goal Reached!", "目标达成！");
+        POV_CN.put("Recipe Unlocked!", "配方解锁！");
+
+        // ===== 教程步骤名 =====
+        POV_CN.put("Movement Keys (WASD)", "移动键（WASD）");
+        POV_CN.put("Look Around with Mouse", "鼠标环视");
+        POV_CN.put("Open Inventory (E)", "打开物品栏（E）");
+        POV_CN.put("Punch a Tree Trunk", "击打树干");
+        POV_CN.put("Craft a Workbench", "合成工作台");
+
+        // ===== Boss 血条样式 =====
+        POV_CN.put("Notched 6", "分段 6");
+        POV_CN.put("Notched 10", "分段 10");
+        POV_CN.put("Notched 12", "分段 12");
+        POV_CN.put("Notched 20", "分段 20");
+        POV_CN.put("Wither", "凋灵");
+
+        // ===== 系统通知类 =====
+        POV_CN.put("Narrator", "旁白");
+        POV_CN.put("Narrator is now active", "旁白已激活");
+        POV_CN.put("Screenshot", "截图");
+        POV_CN.put("Saved as screenshot.png", "已保存为 screenshot.png");
+        POV_CN.put("World Saved", "世界已保存");
+        POV_CN.put("All chunks have been saved", "所有区块已保存");
+
         LOGGER.info("[BCP-PovTranslator] 翻译表初始化完成，共 {} 条条目", POV_CN.size());
     }
 
