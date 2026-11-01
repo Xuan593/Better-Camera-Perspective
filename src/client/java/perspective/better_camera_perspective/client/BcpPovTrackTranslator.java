@@ -366,6 +366,34 @@ public class BcpPovTrackTranslator {
         POV_CN.put("World Saved", "世界已保存");
         POV_CN.put("All chunks have been saved", "所有区块已保存");
 
+        // ===== GUI 装备槽位 =====
+        POV_CN.put("Head Armor", "头盔护甲");
+        POV_CN.put("Chest Armor", "胸甲护甲");
+        POV_CN.put("Leg Armor", "护腿护甲");
+        POV_CN.put("Feet Armor", "靴子护甲");
+
+        // ===== 菜单设置按钮（Menu: xxx 格式）=====
+        POV_CN.put("Menu: Death", "菜单：死亡");
+        POV_CN.put("Menu: Game Menu", "菜单：游戏菜单");
+        POV_CN.put("Menu: Sleep", "菜单：睡觉");
+
+        // ===== Boss血条设置按钮（Boss: xxx / Color: xxx / Style: xxx 格式）=====
+        POV_CN.put("Boss: Raid", "Boss：袭击");
+        POV_CN.put("Boss: Ender Dragon", "Boss：末影龙");
+        POV_CN.put("Raid", "袭击");
+        POV_CN.put("Color: Red", "颜色：红色");
+        POV_CN.put("Color: Pink", "颜色：粉色");
+        POV_CN.put("Color: Blue", "颜色：蓝色");
+        POV_CN.put("Color: Green", "颜色：绿色");
+        POV_CN.put("Color: Yellow", "颜色：黄色");
+        POV_CN.put("Color: Purple", "颜色：紫色");
+        POV_CN.put("Color: White", "颜色：白色");
+        POV_CN.put("Style: Progress", "样式：进度条");
+        POV_CN.put("Style: Notched 6", "样式：分段 6");
+        POV_CN.put("Style: Notched 10", "样式：分段 10");
+        POV_CN.put("Style: Notched 12", "样式：分段 12");
+        POV_CN.put("Style: Notched 20", "样式：分段 20");
+
         LOGGER.info("[BCP-PovTranslator] 翻译表初始化完成，共 {} 条条目", POV_CN.size());
     }
 
