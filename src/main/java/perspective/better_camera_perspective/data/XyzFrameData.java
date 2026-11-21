@@ -9,14 +9,15 @@ import mchorse.bbs_mod.data.types.MapType;
  * 不再共用一个 double 池、也不再读剪辑级共享模式，杜绝跨路线相互污染：
  *
  * <ul>
- *   <li>{@link #roamValue}：游动路线（anchor 关键帧值为 {@code <无>}）的世界坐标；
- *       游动的「相对 / 绝对」两值无锚点可换算，二者同值。</li>
+ *   <li>{@link #roamValue}：游动路线（anchor 关键帧值为 {@code <无>}）的世界绝对坐标。</li>
  *   <li>{@link #trackRelative}：追踪路线（anchor 绑定模型）的相对锚点偏移。</li>
  *   <li>{@link #trackAbsolute}：追踪路线的绝对世界坐标。
  *       与 trackRelative 按编辑时刻锚点互转（相对 + 锚点 = 绝对）。</li>
- *   <li>{@link #roamMode} / {@link #trackMode}：该帧各自的小模式——
- *       0 = 相对（游动再叠加 offset 调试值；追踪按「锚点 + 偏移」合成）；
- *       1 = 绝对（游动 / 追踪均直接使用世界坐标，不叠加）。</li>
+ *   <li>{@link #roamMode}：历史兼容字段。V1.8.0-Alpha 起游动恒定绝对语义（UI 已移除「相对」子模式），
+ *       新写入帧恒为 1；旧存档中 0 表示历史相对态（世界坐标 = roamValue + 剪辑「偏移」），
+ *       播放端保留该分支以保证老影片画面零偏移。</li>
+ *   <li>{@link #trackMode}：该帧追踪小模式——
+ *       0 = 相对（按「锚点 + 偏移」合成）；1 = 绝对（直接使用世界坐标，不叠加）。</li>
  * </ul>
  *
  * 序列化：5 个字段写 MapType（与 BBS Anchor 值同风格）。
@@ -27,13 +28,13 @@ import mchorse.bbs_mod.data.types.MapType;
  * 因此工厂必须在启动时注册，否则通道存档时写不出类型、读档时 keyframes 会被整段丢弃。</p>
  */
 public class XyzFrameData {
-    /** 游动路线世界坐标（游动相对 / 绝对同值）。 */
+    /** 游动路线世界绝对坐标。 */
     public double roamValue;
     /** 追踪路线相对锚点偏移。 */
     public double trackRelative;
     /** 追踪路线绝对世界坐标。 */
     public double trackAbsolute;
-    /** 该帧游动小模式：0 相对 / 1 绝对。 */
+    /** 游动历史兼容模式：新帧恒 1（绝对）；旧存档 0 = 历史相对态（世界 = roamValue + 偏移）。 */
     public int roamMode;
     /** 该帧追踪小模式：0 相对 / 1 绝对。 */
     public int trackMode;

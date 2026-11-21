@@ -19,19 +19,20 @@ import perspective.better_camera_perspective.data.XyzFrameData;
 import java.util.function.Consumer;
 
 /**
- * XYZ 帧级四值编辑工厂（V1.5.4-Alpha 十版：存储重构）。
+ * XYZ 帧级数值编辑工厂（V1.5.4-Alpha 十版：存储重构；V1.8.0-Alpha：移除游动相对态）。
  *
- * 选中多样追踪剪辑的 xd / yd / zd 帧级关键帧时，显示两组「相对 / 绝对」数值：
+ * 选中多样追踪剪辑的 xd / yd / zd 帧级关键帧时，显示两组数值：
  *
  *   组1 · 游动（只影响 anchor 关键帧值为 <无> 的视角）—— 品红 0xFFFF6666
- *     相对：世界 = roamValue + offset（offset 为剪辑「偏移」调试值）
- *     绝对：世界 = roamValue
+ *     绝对（唯一语义）：世界 = roamValue，roamValue 即相机世界绝对坐标
+ *     注：V1.8.0-Alpha 起不再提供「相对」子模式——游动本就读取绝对坐标，
+ *         原先的「相对」只是叠加剪辑「偏移」调试值，属冗余状态。「绝对」标识保留为静态文本。
  *   组2 · 追踪（只影响 anchor 关键帧绑定模型的视角）—— 淡蓝 0x87CEFA
  *     相对：世界 = 锚点 + trackRelative
  *     绝对：世界 = trackAbsolute
  *
- * 所有值均为**每帧独立存储**（XyzFrameData），游动与追踪不再共用同一个池；
- * 切换相对 / 绝对模式时按当前基准（offset / 锚点）相互转换，世界坐标保持不变。
+ * 所有值均为**每帧独立存储**（XyzFrameData）。追踪的「相对 / 绝对」切换仍按当前锚点互转，
+ * 世界坐标保持不变。
  */
 @Environment(EnvType.CLIENT)
 public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
@@ -41,11 +42,9 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
     private static final int COLOR_TRACK = 0x87CEFA;
 
     private final int axis;
-    private final UITrackpad roamRelativeValue;
     private final UITrackpad roamAbsoluteValue;
     private final UITrackpad trackRelativeValue;
     private final UITrackpad trackAbsoluteValue;
-    private final UIButton roamRelativeButton;
     private final UIButton roamAbsoluteButton;
     private final UIButton trackRelativeButton;
     private final UIButton trackAbsoluteButton;
@@ -54,8 +53,6 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         super(keyframe, editor);
         this.axis = axis;
 
-        this.roamRelativeValue = new UITrackpad(this::setRoamRelative);
-        this.roamRelativeValue.h(20);
         this.roamAbsoluteValue = new UITrackpad(this::setRoamAbsolute);
         this.roamAbsoluteValue.h(20);
         this.trackRelativeValue = new UITrackpad(this::setTrackRelative);
@@ -63,8 +60,8 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         this.trackAbsoluteValue = new UITrackpad(this::setTrackAbsolute);
         this.trackAbsoluteValue.h(20);
 
-        this.roamRelativeButton = this.modeButton(b -> this.setRoamMode(0));
-        this.roamAbsoluteButton = this.modeButton(b -> this.setRoamMode(1));
+        // 游动只剩「绝对」一种语义：按钮保留为静态标识（不可切换），文本恒为「绝对」
+        this.roamAbsoluteButton = this.modeButton(b -> {});
         this.trackRelativeButton = this.modeButton(b -> this.setTrackMode(0));
         this.trackAbsoluteButton = this.modeButton(b -> this.setTrackMode(1));
 
@@ -72,7 +69,6 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         UILabel roamTitle = new UILabel(IKey.raw("游动"), COLOR_ROAM);
         roamTitle.relative(this.scroll).w(1.0F).h(20);
         this.scroll.add(roamTitle);
-        this.scroll.add(UI.row(2, 0, 0, this.roamRelativeButton, this.roamRelativeValue));
         this.scroll.add(UI.row(2, 0, 0, this.roamAbsoluteButton, this.roamAbsoluteValue));
 
         // 组2 · 追踪
@@ -98,25 +94,7 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         return (XyzFrameData) this.keyframe.getValue();
     }
 
-    // —— 模式切换（世界坐标保持不变：相对 ⇄ 绝对相互转换）——
-
-    /** 游动模式切换：0 相对 / 1 绝对；按 offset 调试值转换 roamValue。 */
-    private void setRoamMode(int mode) {
-        XyzFrameData data = this.frameData();
-        if (data != null && data.roamMode != mode) {
-            double offset = this.debugOffset();
-            if (mode == 0) {
-                // 绝对 → 相对：roamValue = roamValue − offset
-                data.roamValue -= offset;
-            } else {
-                // 相对 → 绝对：roamValue = roamValue + offset
-                data.roamValue += offset;
-            }
-            data.roamMode = mode;
-        }
-        this.refreshButtons();
-        this.updateValues();
-    }
+    // —— 模式切换（仅追踪保留相对 / 绝对，游动恒为绝对）——
 
     /** 追踪模式切换：0 相对 / 1 绝对；按当前锚点转换相对 / 绝对值。 */
     private void setTrackMode(int mode) {
@@ -142,20 +120,18 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         return clip != null && UIMultiTrackerClip.hasTrackTarget(clip, this.keyframe.getTick());
     }
 
-    /** 刷新四按钮文本与选中态（当前路线组高亮其选中模式，另一组不高亮）。 */
+    /** 刷新按钮文本与选中态（游动恒为绝对并仅在该路线下高亮；追踪按模式高亮）。 */
     private void refreshButtons() {
         XyzFrameData data = this.frameData();
         boolean tracked = this.isTracked();
-        int roamMode = data == null ? 0 : data.roamMode;
         int trackMode = data == null ? 0 : data.trackMode;
 
-        this.roamRelativeButton.label = IKey.raw("相对");
         this.roamAbsoluteButton.label = IKey.raw("绝对");
         this.trackRelativeButton.label = IKey.raw("相对");
         this.trackAbsoluteButton.label = IKey.raw("绝对");
 
-        this.styleButton(this.roamRelativeButton, COLOR_ROAM, !tracked && roamMode == 0);
-        this.styleButton(this.roamAbsoluteButton, COLOR_ROAM, !tracked && roamMode == 1);
+        // 游动只有绝对一种语义：本路线下常亮，非本路线时仅保留文字色（不可点）
+        this.styleButton(this.roamAbsoluteButton, COLOR_ROAM, !tracked);
         this.styleButton(this.trackRelativeButton, COLOR_TRACK, tracked && trackMode == 0);
         this.styleButton(this.trackAbsoluteButton, COLOR_TRACK, tracked && trackMode == 1);
     }
@@ -169,22 +145,18 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         }
     }
 
-    // —— 四值编辑回调（只改当前帧，改完全刷四框）——
+    // —— 数值编辑回调（只改当前帧，改完全刷数值框）——
 
-    /** 游动·相对：按当前模式反推 roamValue（相对模式直接写；绝对模式 = value + offset）。 */
-    private void setRoamRelative(double value) {
-        XyzFrameData data = this.frameData();
-        if (data != null) {
-            data.roamValue = data.roamMode == 0 ? value : value + this.debugOffset();
-            this.updateValues();
-        }
-    }
-
-    /** 游动·绝对：绝对模式直接写；相对模式 = value − offset。 */
+    /**
+     * 游动·绝对（唯一入口）：直接写世界绝对坐标，并把该帧归一为绝对模式。
+     * 旧存档中 roamMode == 0（历史相对态）的帧一经用户编辑即静默迁移为 1，
+     * 迁移瞬间世界坐标保持不变（旧值按 roamValue + offset 读出，写回时已是绝对值）。
+     */
     private void setRoamAbsolute(double value) {
         XyzFrameData data = this.frameData();
         if (data != null) {
-            data.roamValue = data.roamMode == 1 ? value : value - this.debugOffset();
+            data.roamValue = value;
+            data.roamMode = 1;
             this.updateValues();
         }
     }
@@ -215,7 +187,7 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         }
     }
 
-    /** 剪辑级「偏移」调试值（该轴），游动相对模式下叠加到 roamValue。 */
+    /** 剪辑级「偏移」调试值（该轴）：仅用于读取旧存档 roamMode == 0 的历史相对态帧。 */
     private double debugOffset() {
         MultiTrackerClientClip clip = this.findClip();
         if (clip == null) {
@@ -235,17 +207,14 @@ public class UIXyzKeyframeFactory extends UIKeyframeFactory<XyzFrameData> {
         return UIMultiTrackerClip.anchorAxisAt(clip, panel, this.axis, this.keyframe.getTick());
     }
 
-    /** 全刷四框（按当前模式把帧值换算成相对 / 绝对表示）。 */
+    /** 全刷数值框（游动按绝对口径读；追踪按当前模式换算相对 / 绝对表示）。 */
     private void updateValues() {
         XyzFrameData data = this.frameData();
         if (data == null) {
             return;
         }
-        double offset = this.debugOffset();
-        double roamAbsolute = data.roamMode == 1 ? data.roamValue : data.roamValue + offset;
-        double roamRelative = data.roamMode == 0 ? data.roamValue : data.roamValue - offset;
-        this.roamRelativeValue.setValue(roamRelative);
-        this.roamAbsoluteValue.setValue(roamAbsolute);
+        // 旧存档 roamMode == 0 的帧按「roamValue + offset」读出，保证升级前后画面零偏移
+        this.roamAbsoluteValue.setValue(data.roamMode == 1 ? data.roamValue : data.roamValue + this.debugOffset());
 
         double anchor = this.anchor();
         double trackAbsolute = data.trackMode == 1 ? data.trackAbsolute : anchor + data.trackRelative;

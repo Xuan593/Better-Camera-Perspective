@@ -13,10 +13,11 @@ import mchorse.bbs_mod.ui.framework.elements.overlay.UIOverlayPanel;
 import mchorse.bbs_mod.ui.utils.UI;
 import mchorse.bbs_mod.ui.utils.resizers.layout.GridResizer;
 import mchorse.bbs_mod.utils.clips.Clip;
-import mchorse.bbs_mod.utils.factory.MapFactory;
+import mchorse.bbs_mod.utils.factory.IFactory;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import perspective.better_camera_perspective.client.BcpClipProcessing;
+import perspective.better_camera_perspective.client.BcpPovTrackTranslator;
 import perspective.better_camera_perspective.client.BcpVisibility;
 
 import java.util.ArrayList;
@@ -41,9 +42,13 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
     private static final int GRID_GAP = 8;
 
     private final UIScrollView scroll;
+    /** 本面板对应的剪辑工厂（V1.7.20-Alpha：按编辑器分池，不再固定读摄像机工厂） */
+    private final IFactory<Clip, ClipFactoryData> factory;
 
-    public BcpVisibilityOverlayPanel() {
+    public BcpVisibilityOverlayPanel(IFactory<Clip, ClipFactoryData> factory) {
         super(L10n.lang("bbs.ui.camera.visibility_settings"));
+
+        this.factory = factory != null ? factory : BBSMod.getFactoryCameraClips();
 
         // 剪辑列表（3 列网格 + 可滚动）
         this.scroll = UI.scrollView(4, 6);
@@ -58,6 +63,10 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
         this.rebuild();
     }
 
+    public BcpVisibilityOverlayPanel() {
+        this(null);
+    }
+
     /** 重建列表（初始构建 / 筛选调整后自动重排） */
     private void rebuild() {
         this.scroll.removeAll();
@@ -66,24 +75,23 @@ public class BcpVisibilityOverlayPanel extends UIOverlayPanel {
         grid.relative(this.scroll).w(1.0F);
         GridResizer.apply(grid, GRID_GAP).items(COLUMNS);
 
-        MapFactory<Clip, ClipFactoryData> factory = BBSMod.getFactoryCameraClips();
-        if (factory != null) {
+        if (this.factory != null) {
             List<Link> keys = new ArrayList<>();
-            for (Link key : factory.getKeys()) {
+            for (Link key : this.factory.getKeys()) {
                 keys.add(key);
             }
             // 静态模式：保留原注册顺序，被隐藏的剪辑布局位置不变（不重排）
             // 动态模式：筛选后自动重排（可见剪辑排前，隐藏剪辑沉底）
             if (BcpClipProcessing.getVisibilityLayoutMode() != BcpClipProcessing.LAYOUT_STATIC_IDX) {
-                keys.sort((a, b) -> Boolean.compare(BcpVisibility.getVisible(b), BcpVisibility.getVisible(a)));
+                keys.sort((a, b) -> Boolean.compare(BcpVisibility.getVisible(this.factory, b), BcpVisibility.getVisible(this.factory, a)));
             }
 
             for (Link key : keys) {
                 UIToggle toggle = new UIToggle(
-                    UIKeys.C_CLIP.get(key),
-                    BcpVisibility.getVisible(key),
+                    BcpPovTrackTranslator.localized(UIKeys.C_CLIP.get(key)),
+                    BcpVisibility.getVisible(this.factory, key),
                     t -> {
-                        BcpVisibility.setVisible(key, t.getValue());
+                        BcpVisibility.setVisible(this.factory, key, t.getValue());
                         this.rebuild();
                     }
                 );

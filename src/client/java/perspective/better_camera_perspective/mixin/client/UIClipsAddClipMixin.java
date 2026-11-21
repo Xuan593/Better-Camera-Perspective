@@ -2,6 +2,7 @@ package perspective.better_camera_perspective.mixin.client;
 
 import mchorse.bbs_mod.camera.clips.ClipFactoryData;
 import mchorse.bbs_mod.l10n.L10n;
+import mchorse.bbs_mod.l10n.keys.IKey;
 import mchorse.bbs_mod.resources.Link;
 import mchorse.bbs_mod.ui.UIKeys;
 import mchorse.bbs_mod.ui.film.UIClips;
@@ -22,6 +23,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import perspective.better_camera_perspective.client.BcpClipProcessing;
+import perspective.better_camera_perspective.client.BcpPovTrackTranslator;
 import perspective.better_camera_perspective.client.BcpVisibility;
 import perspective.better_camera_perspective.client.ui.BcpAdaptiveClipMenu;
 import perspective.better_camera_perspective.client.ui.BcpCategorizedClipMenu;
@@ -53,23 +55,26 @@ public class UIClipsAddClipMixin {
             context.notifyError(UIKeys.CAMERA_TIMELINE_CANT_FIT_NOTIFICATION);
         } else {
             // 「可视性设置」伪条目：恒定排在菜单最前（列1 第一格 = 1 号位）
+            // V1.7.20-Alpha：把当前编辑器的剪辑工厂一起传下去，面板只列本编辑器的剪辑
             ContextAction visibilityAction = new ContextAction(
                 Icons.SETTINGS,
                 L10n.lang("bbs.ui.camera.visibility_settings"),
-                () -> BcpVisibility.openVisibilityPanel(context)
+                () -> BcpVisibility.openVisibilityPanel(context, this.factory)
             );
 
             List<ContextAction> clipActions = new ArrayList<>();
             List<String> clipKeys = new ArrayList<>();
             for (Link key : this.factory.getKeys()) {
-                if (!BcpVisibility.isClipVisible(key)) {
+                if (!BcpVisibility.isClipVisible(this.factory, key)) {
                     continue;
                 }
                 ClipFactoryData data = this.factory.getData(key);
                 Runnable run = () -> this.addClip(key, preview.x, preview.y, preview.z);
+                // V1.7.20-Alpha：剪辑类型名过一遍翻译表（POV 动作名走 L10n 键，不经 StringKey.get）
+                IKey nameKey = BcpPovTrackTranslator.localized(UIKeys.C_CLIP.get(key));
                 ContextAction action = data.color != 0
-                    ? new ColorfulContextAction(data.icon, UIKeys.C_CLIP.get(key), run, data.color)
-                    : new ContextAction(data.icon, UIKeys.C_CLIP.get(key), run);
+                    ? new ColorfulContextAction(data.icon, nameKey, run, data.color)
+                    : new ContextAction(data.icon, nameKey, run);
                 clipActions.add(action);
                 clipKeys.add(key.toString());
             }

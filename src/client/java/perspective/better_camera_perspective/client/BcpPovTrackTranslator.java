@@ -494,12 +494,14 @@ public class BcpPovTrackTranslator {
                 }
                 return bcpResult;
             case BcpConflictDetection.POV_TRACK_CUBED_FIRST_IDX:
-                // Cubed优先：只调 Cubed，Cubed 没翻译就返回原文
+                // Cube优先：只调 Cubed，Cubed 没翻译就返回原文
+                // V1.7.19-Alpha：Cubed 未覆盖的条目改为「BCP 表兜底」，避免残留英文
+                // （Cubed 3.6.8 的 ITEM_SPRAY / AAA_PARTICLE 等新表不覆盖 POV 动作菜单名）
                 String cubedOnly = cubedLocalize(id);
                 if (cubedOnly != null && !cubedOnly.equals(id)) {
                     return cubedOnly;
                 }
-                return id; // 保持英文
+                return POV_CN.get(id); // 无则 null → 调用方保留原文
             case BcpConflictDetection.POV_TRACK_CUBED_WITH_BCP_IDX:
             default:
                 // Cubed为主，BCP辅助：先 Cubed，没覆盖的用 BCP 补充
@@ -509,6 +511,29 @@ public class BcpPovTrackTranslator {
                 }
                 return POV_CN.get(id);
         }
+    }
+
+    /**
+     * 把语言键解析后的文本过一遍翻译表（V1.7.20-Alpha）。
+     * 用于「剪辑类型名」这类走 L10n 键、而非 StringKey.get 的显示位：
+     * 先取当前语言文本（英文），命中翻译表则返回静态中文键，否则原样返回。
+     */
+    public static mchorse.bbs_mod.l10n.keys.IKey localized(mchorse.bbs_mod.l10n.keys.IKey key) {
+        if (key == null) {
+            return null;
+        }
+        try {
+            String text = key.get();
+            if (text == null || text.isEmpty()) {
+                return key;
+            }
+            String translated = translate(text);
+            if (translated != null && !translated.isEmpty() && !translated.equals(text)) {
+                return mchorse.bbs_mod.l10n.keys.IKey.raw(translated);
+            }
+        } catch (Exception ignored) {
+        }
+        return key;
     }
 
     /**

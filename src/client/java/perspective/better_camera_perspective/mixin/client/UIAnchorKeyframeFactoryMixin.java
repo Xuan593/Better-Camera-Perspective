@@ -29,10 +29,12 @@ import mchorse.bbs_mod.ui.utils.icons.Icons;
 import mchorse.bbs_mod.utils.clips.Clip;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.loader.api.FabricLoader;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import perspective.better_camera_perspective.client.BcpConflictDetection;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
 import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
@@ -66,6 +68,13 @@ import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 public class UIAnchorKeyframeFactoryMixin {
     @Inject(method = "displayActors", at = @At("HEAD"), cancellable = true)
     private static void bcp$displayActors(UIContext context, Map<String, IEntity> entities, String value, Consumer<String> callback, CallbackInfo ci) {
+        // V1.7.20-Alpha：让「设置 - 功能冲突检测 - 伪装选取」真正生效。
+        // 选 Cubed优先 且 Cubed 已加载时，不接管演员列表，交回 BBS / Cubed 原生实现；
+        // 选 BCP优先 时才走本插件的分组列表 + 伪装名优先 + 选后归零 XYZ。
+        if (BcpConflictDetection.getDisguiseMode() == BcpConflictDetection.DISGUISE_CUBED_FIRST_IDX
+            && FabricLoader.getInstance().isModLoaded("bbsplusplus")) {
+            return;
+        }
         // v1.4.1：多样追踪剪辑上下文中，选择锚点目标后自动归零 XYZ 相对值
         //（anchor 轴关键帧选择与属性面板「选取目标」共用此入口）
         bcp$showActorList(context, value, bcp$wrapReset(context, callback));

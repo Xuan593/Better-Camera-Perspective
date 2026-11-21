@@ -37,6 +37,7 @@ import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
+import perspective.better_camera_perspective.client.clips.AnchorSampler;
 import perspective.better_camera_perspective.client.clips.MultiTrackerClientClip;
 import perspective.better_camera_perspective.data.XyzFrameData;
 import perspective.better_camera_perspective.data.PhaseFrameData;
@@ -300,6 +301,8 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         data.roamValue = camera;
         data.trackRelative = camera - anchor;
         data.trackAbsolute = camera;
+        // V1.8.0-Alpha：游动恒定绝对语义，新写帧一律归一为绝对模式（旧存档相对态帧经编辑后静默迁移）
+        data.roamMode = 1;
         int insert = channel.insert(tick, data);
         if (segment != null) {
             channel.get(insert).copyOverExtra(segment.a);
@@ -416,6 +419,8 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         data.roamValue = camera;
         data.trackRelative = camera - anchor;
         data.trackAbsolute = camera;
+        // V1.8.0-Alpha：游动恒定绝对语义
+        data.roamMode = 1;
         return data;
     }
 
@@ -574,19 +579,8 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
             String sel = clip.selector.get();
             return sel != null && !sel.isEmpty();
         }
-        Anchor anchor = channel.interpolate(tick);
-        if (anchor == null) {
-            Anchor best = null;
-            float bestTick = -1.0F;
-            for (Keyframe keyframe : channel.getKeyframes()) {
-                if (keyframe.getTick() <= tick && keyframe.getTick() >= bestTick) {
-                    best = (Anchor) keyframe.getValue();
-                    bestTick = keyframe.getTick();
-                }
-            }
-            anchor = best;
-        }
-        return anchor != null && anchor.hasTarget();
+        // V1.7.19-Alpha：与播放端同源，统一按「本帧有效关键帧」判定路线
+        return AnchorSampler.sample(channel, tick).routeIsTrack();
     }
 
     /** v1.5.4-Alpha：当前播放头在剪辑内的 tick（与 insertKeyframes 口径一致）。 */
@@ -607,13 +601,12 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         String sel = clip.selector.get();
         String grp = clip.group.get();
         if (!clip.anchor.isEmpty()) {
-            Anchor anchor = clip.anchor.interpolate(tick);
-            if (anchor == null || !anchor.hasTarget()) {
-                anchor = nearestAnchorAtOrBefore(clip.anchor, tick);
-            }
-            if (anchor != null && anchor.hasTarget()) {
-                sel = anchor.replay;
-                grp = anchor.attachment;
+            // V1.7.19-Alpha：与播放端同源——只在「本帧有效关键帧」绑定目标时取锚点；
+            // 本帧为空值（游动）时不回退更早的绑定帧，保证 UI 双值与播放画面口径一致。
+            Anchor cur = AnchorSampler.sample(clip.anchor, tick).cur;
+            if (AnchorSampler.hasTarget(cur)) {
+                sel = cur.replay;
+                grp = cur.attachment;
             }
         }
 

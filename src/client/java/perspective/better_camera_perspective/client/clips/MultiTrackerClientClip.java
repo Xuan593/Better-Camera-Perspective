@@ -29,7 +29,6 @@ import perspective.better_camera_perspective.data.XyzFrameData;
 import perspective.better_camera_perspective.data.XyzFrameDataKeyframeFactory;
 import perspective.better_camera_perspective.data.PhaseFrameData;
 import perspective.better_camera_perspective.data.PhaseFrameDataKeyframeFactory;
-import perspective.better_camera_perspective.client.ui.UIMultiTrackerClip;
 
 /**
  * 多样追踪（MultiTracker）——客户端剪辑类。
@@ -89,6 +88,13 @@ public class MultiTrackerClientClip extends KeyframeClip {
     /** 相对模式所需的进入本剪辑前的相机位置（等效 EntityClip.position）。 */
     public Position position = new Position(0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 
+    /**
+     * 单次 applyClip 内的追踪求值缓存（V1.7.19-Alpha）：
+     * 同一 tick 上「目标 + 参考点」相同的 track() 结果直接复用，
+     * 避免 主目标 / 过渡端 / 相位追踪 对同一目标重复求解并重复走 applyUnderneath。
+     */
+    private final java.util.Map<String, Position> trackCache = new java.util.HashMap<>();
+
     public MultiTrackerClientClip() {
         this.add(this.selector);
         this.add(this.offset);
@@ -106,6 +112,8 @@ public class MultiTrackerClientClip extends KeyframeClip {
 
     @Override
     public void applyClip(ClipContext context, Position position) {
+        // 每帧清空追踪求值缓存（同帧内同目标 + 同参考点可直接复用）
+        this.trackCache.clear();
         boolean additive = this.additive.get();
         boolean lookAt = this.lookAt.get();
         // v1.0：XYZ 关键帧固定为「相对值」语义（锚点 + 关键帧偏移合成；lookAt / 叠加除外）
@@ -113,7 +121,12 @@ public class MultiTrackerClientClip extends KeyframeClip {
         // v1.5.4-Alpha 二版：进入本剪辑前的相机位置快照，供无锚点空通道回退（不飞回 0 0 0）
         Position basePosition = position.copy();
 
-        // —— 1) 追踪目标解析（anchor 轴优先，v0.3）——
+        // —— 1) 追踪目标解析（统一采样器，V1.7.19-Alpha）——
+        // 口径一律以「本帧有效 anchor 关键帧」为准（last ≤ tick），不再用 interpolate()：
+        // BBS 的整数刻段前移 + Anchor 工厂离散硬切换会让 interpolate 在关键帧刻读到下一帧状态，
+        // 这正是「每到一个关键帧就回跳一次」的结构性根因。
+        AnchorSampler sample = AnchorSampler.sample(this.anchor, (float) context.relativeTick + context.transition);
+
         String sel = this.selector.get();
         String grp = this.group.get();
         String fromSel = null;
@@ -121,38 +134,26 @@ public class MultiTrackerClientClip extends KeyframeClip {
         float blend = 1.0F;
         boolean blendSource = false;
 
-        if (context instanceof CameraClipContext) {
-            Anchor anchor = this.anchor.isEmpty() ? null : this.anchor.interpolate((float) context.relativeTick + context.transition);
-            if (anchor != null) {
-                if (anchor.hasTarget()) {
-                    sel = anchor.replay;
-                    grp = anchor.attachment;
-                    if (anchor.previous != null && anchor.previous.hasTarget() && !anchor.previous.hasSameTarget(anchor)) {
-                        fromSel = anchor.previous.replay;
-                        fromGrp = anchor.previous.attachment;
-                        blend = anchor.x;
-                        blendSource = true;
-                    } else if (anchor.previous != null && !anchor.previous.hasTarget()) {
-                        fromSel = this.selector.get();
-                        fromGrp = this.group.get();
-                        blend = anchor.x;
-                        blendSource = true;
-                    }
-                } else if (anchor.previous != null && anchor.previous.hasTarget()) {
-                    sel = this.selector.get();
-                    grp = this.group.get();
-                    fromSel = anchor.previous.replay;
-                    fromGrp = anchor.previous.attachment;
-                    blend = 1.0F - anchor.x;
-                    blendSource = true;
-                }
-            }
+        if (sample.cur != null && sample.cur.hasTarget()) {
+            sel = sample.cur.replay;
+            grp = sample.cur.attachment;
+        }
+
+        // 追踪 → 追踪（不同目标）：段内从 cur 目标过渡到 next 目标（进度 = sample.t）
+        if (sample.isCrossTarget()) {
+            sel = sample.next.replay;
+            grp = sample.next.attachment;
+            fromSel = sample.cur.replay;
+            fromGrp = sample.cur.attachment;
+            blend = sample.t;
+            blendSource = true;
         }
 
         // —— 2) 追踪求值（含过渡混合）——
-        // 路线由 anchor 关键帧值判定（<无> = 游动；绑定模型 / 伪装 = 追踪；anchor 无关键帧回落剪辑属性）。
+        // 路线由「本帧 anchor 关键帧值」判定（<无> = 游动；绑定模型 / 伪装 = 追踪）；
+        // anchor 通道完全无关键帧时回落剪辑属性绑定。
         float tick = (float) context.relativeTick + context.transition;
-        boolean trackRoute = UIMultiTrackerClip.hasTrackTarget(this, tick);
+        boolean trackRoute = sample.cur == null ? !this.selector.get().isEmpty() : sample.routeIsTrack();
         boolean tracked = false;
         boolean trackResolved = false;
         double anchorX = 0.0D, anchorY = 0.0D, anchorZ = 0.0D;
@@ -316,42 +317,26 @@ public class MultiTrackerClientClip extends KeyframeClip {
     }
 
     /**
-     * V1.5.4-Alpha 十版：检测 anchor 关键帧的「游动⇄追踪过渡段」。
-     * tick 所在段相邻两帧 anchor 状态不同（<无> ⇄ 绑定模型）时返回混合信息，
-     * 并解析追踪端（绑定端）在当前 tick 的锚点 Position（不与其他 anchor 帧混合）；
-     * 两端状态相同返回 null（无过渡，走对应路线）。
+     * V1.7.19-Alpha：检测 anchor 关键帧的「游动 ⇄ 追踪」过渡段。
+     * 与 {@link AnchorSampler} 同源：cur = 本帧关键帧、next = 下一关键帧、t = 段内进度。
+     * 两端路线不同（一空一绑）时返回混合信息，并解析「绑定端」在当前 tick 的锚点 Position；
+     * 两端路线相同返回 null（无过渡，走对应路线）。
      */
     private RouteBlend routeBlend(ClipContext context, float tick, boolean lookAt) {
-        if (this.anchor == null || this.anchor.isEmpty()) {
+        AnchorSampler sample = AnchorSampler.sample(this.anchor, tick);
+
+        if (!sample.isCrossRoute()) {
             return null;
         }
-        Keyframe a = null;
-        Keyframe b = null;
-        for (Keyframe keyframe : this.anchor.getKeyframes()) {
-            if (keyframe.getTick() <= tick) {
-                a = keyframe;
-            } else if (b == null) {
-                b = keyframe;
-            }
-        }
-        if (a == null || b == null) {
+        if (sample.t <= 0.0F || sample.t >= 1.0F) {
+            // 端点交给各自的纯路线分支处理，避免两端重复混合
             return null;
         }
-        Anchor av = (Anchor) a.getValue();
-        Anchor bv = (Anchor) b.getValue();
-        boolean aTarget = av != null && av.hasTarget();
-        boolean bTarget = bv != null && bv.hasTarget();
-        if (aTarget == bTarget) {
-            return null;
-        }
-        float span = b.getTick() - a.getTick();
-        if (span <= 0.0F) {
-            return null;
-        }
-        float t = Math.min(1.0F, Math.max(0.0F, (tick - a.getTick()) / span));
-        RouteBlend rb = new RouteBlend(t);
-        // 追踪端 = 绑定模型的 anchor 帧，单独解析其当前 tick 位置 / 角度
-        Anchor trackEnd = aTarget ? av : bv;
+
+        boolean fromIsTrack = AnchorSampler.hasTarget(sample.cur);
+        RouteBlend rb = new RouteBlend(sample.t, fromIsTrack);
+        Anchor trackEnd = fromIsTrack ? sample.cur : sample.next;
+
         Position cur = this.track(context, this.position, trackEnd.replay, trackEnd.attachment, lookAt);
         if (cur != null) {
             rb.trackPoint[0] = (float) cur.point.x;
@@ -365,31 +350,44 @@ public class MultiTrackerClientClip extends KeyframeClip {
         return rb;
     }
 
-    /** 路线过渡信息：段内进度 t + 追踪端锚点在当前 tick 的位置 / 角度。 */
+    /** 路线过渡信息：段内进度 t + 过渡起点是否为追踪端 + 追踪端锚点在当前 tick 的位置 / 角度。 */
     private static final class RouteBlend {
         final float t;
+        /** true = 起点是追踪端（追踪 → 游动）；false = 起点是游动端（游动 → 追踪）。 */
+        final boolean fromIsTrack;
         final float[] trackPoint = new float[3];
         final float[] trackAngle = new float[3];
         boolean trackResolved;
 
-        RouteBlend(float t) {
+        RouteBlend(float t, boolean fromIsTrack) {
             this.t = t;
+            this.fromIsTrack = fromIsTrack;
         }
     }
 
-    /** 取某轴当前 tick 的帧级数据（新通道优先；空时回退父类老 Double 通道，兼容老存档）。 */
+    /** 取某轴当前 tick 的帧级数据（新通道优先；新通道为空时才回退父类老 Double 通道，兼容老存档）。 */
     private static XyzFrameData fdAt(KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old, float tick) {
-        if (!data.isEmpty() && data.findSegment(tick) != null) {
-            return data.interpolate(tick);
+        if (data != null && !data.isEmpty()) {
+            // V1.7.19-Alpha：新通道只要有帧就一律以它为准——即便当前 tick 落在无段区间（首帧之前），
+            // 也不再回退旧通道，避免父类 x/y/z 残留的 tick 0 默认帧把画面钉成常数。
+            if (data.findSegment(tick) != null) {
+                return data.interpolate(tick);
+            }
+            return null;
         }
-        if (!old.isEmpty() && old.findSegment(tick) != null) {
+        if (old != null && !old.isEmpty() && old.findSegment(tick) != null) {
             double v = old.interpolate(tick);
-            return new XyzFrameData(v, v, v, 0, 0);
+            return new XyzFrameData(v, v, v, 1, 0);
         }
         return null;
     }
 
-    /** 游动端世界坐标：帧 roamValue（相对模式再叠加 offset 调试；绝对模式直接用）。无数据回退 baseAxis。 */
+    /**
+     * 游动端世界坐标：roamValue 即相机世界绝对坐标。
+     * V1.8.0-Alpha 起游动恒定绝对语义（UI 已移除「相对」子模式）；
+     * 此处保留 roamMode == 0 分支仅为旧存档兼容——历史相对态帧的世界坐标 = roamValue + 剪辑「偏移」，
+     * 保证升级前后画面零偏移。新写入帧一律 roamMode == 1，直接取 roamValue。
+     */
     private double roamWorld(KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old, float tick,
                              double baseAxis, double debugAxis) {
         XyzFrameData fd = fdAt(data, old, tick);
@@ -412,7 +410,7 @@ public class MultiTrackerClientClip extends KeyframeClip {
         return anchorResolved ? anchorAxis + fd.trackRelative : baseAxis;
     }
 
-    /** 求一个位置轴的最终世界坐标（含游动⇄追踪过渡）。 */
+    /** 求一个位置轴的最终世界坐标（含「起点路线 → 终点路线」定向过渡）。 */
     private double resolvePointAxis(int axis, float tick, boolean tracked, boolean trackResolved,
                                     double anchorAxis, double baseAxis, double debugAxis, RouteBlend rb) {
         KeyframeChannel<XyzFrameData> data = axis == 0 ? this.xd : axis == 1 ? this.yd : this.zd;
@@ -421,7 +419,10 @@ public class MultiTrackerClientClip extends KeyframeClip {
         if (inBlend) {
             double roam = this.roamWorld(data, old, tick, baseAxis, debugAxis);
             double track = this.trackWorld(data, old, tick, rb.trackPoint[axis], rb.trackResolved, baseAxis);
-            return roam + (track - roam) * (double) rb.t;
+            // 过渡方向由起点路线决定：追踪 → 游动 时 from = 追踪端，反之 from = 游动端
+            double from = rb.fromIsTrack ? track : roam;
+            double to = rb.fromIsTrack ? roam : track;
+            return from + (to - from) * (double) rb.t;
         }
         if (tracked) {
             return this.trackWorld(data, old, tick, anchorAxis, trackResolved, baseAxis);
@@ -429,7 +430,7 @@ public class MultiTrackerClientClip extends KeyframeClip {
         return this.roamWorld(data, old, tick, baseAxis, debugAxis);
     }
 
-    /** 求一个角度轴的最终角度（过渡段：游动端与追踪端按 t 走最短弧；否则关键帧插值，回退对应路线角度）。 */
+    /** 求一个角度轴的最终角度（过渡段按起点路线定向走最短弧；否则关键帧插值，回退对应路线角度）。 */
     private float resolveAngleAxis(int axis, float tick, boolean tracked, float trackFallback,
                                    float baseFallback, RouteBlend rb) {
         KeyframeChannel<Double> ch = axis == 0 ? this.yaw : axis == 1 ? this.pitch : this.roll;
@@ -437,7 +438,9 @@ public class MultiTrackerClientClip extends KeyframeClip {
         if (inBlend) {
             float roam = (float) safeValue(ch, tick, (double) baseFallback);
             float track = (float) safeValue(ch, tick, (double) rb.trackAngle[axis]);
-            return lerpAngle(roam, track, rb.t);
+            float from = rb.fromIsTrack ? track : roam;
+            float to = rb.fromIsTrack ? roam : track;
+            return lerpAngle(from, to, rb.t);
         }
         return (float) safeValue(ch, tick, tracked ? (double) trackFallback : (double) baseFallback);
     }
@@ -451,6 +454,16 @@ public class MultiTrackerClientClip extends KeyframeClip {
         IEntity entity = camera.entities.get(sel);
         if (entity == null) {
             return null;
+        }
+
+        // 同帧缓存：目标 + 朝向模式 + 参考点三者一致时直接复用（省一次 applyUnderneath 与骨骼求解）
+        String cacheKey = sel + "|" + grp + "|" + lookAt
+            + "|" + Math.round(position.point.x * 8.0D)
+            + "|" + Math.round(position.point.y * 8.0D)
+            + "|" + Math.round(position.point.z * 8.0D);
+        Position cached = this.trackCache.get(cacheKey);
+        if (cached != null) {
+            return cached.copy();
         }
 
         if (!context.applyUnderneath(this.tick.get(), 0.0F, this.position)) {
@@ -486,6 +499,7 @@ public class MultiTrackerClientClip extends KeyframeClip {
             result.angle.pitch = this.isActive(4) ? newAngle.pitch : result.angle.pitch;
             result.angle.roll = this.isActive(5) ? newAngle.roll : result.angle.roll;
         }
+        this.trackCache.put(cacheKey, result.copy());
         return result;
     }
 
