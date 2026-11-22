@@ -365,6 +365,99 @@ public class MultiTrackerClientClip extends KeyframeClip {
         }
     }
 
+    /**
+     * 过渡段专用的「纯线性」帧值（V1.7.21-Alpha）。
+     *
+     * BBS 的关键帧带「前 / 后」手柄（duration / motionShift），{@code channel.interpolate()} 会在每个
+     * 关键帧附近做缓动；混进「游动 ⇄ 追踪」过渡后，两端各自缓动再线性混合，观感就是淡入淡出。
+     * 过渡段一律按相邻两帧的**原始值线性插值**，不吃任何缓动，保证衔接是匀速直线。
+     */
+    private static XyzFrameData linearFdAt(KeyframeChannel<XyzFrameData> data, float tick) {
+        if (data == null || data.isEmpty()) {
+            return null;
+        }
+        Keyframe prev = null;
+        Keyframe next = null;
+        for (Keyframe keyframe : data.getKeyframes()) {
+            float kt = keyframe.getTick();
+            if (kt <= tick) {
+                if (prev == null || kt >= prev.getTick()) {
+                    prev = keyframe;
+                }
+            } else if (next == null || kt < next.getTick()) {
+                next = keyframe;
+            }
+        }
+        if (prev == null && next == null) {
+            return null;
+        }
+        if (prev == null) {
+            return ((XyzFrameData) next.getValue()).copy();
+        }
+        XyzFrameData a = (XyzFrameData) prev.getValue();
+        if (a == null) {
+            return null;
+        }
+        if (next == null) {
+            return a.copy();
+        }
+        XyzFrameData b = (XyzFrameData) next.getValue();
+        if (b == null) {
+            return a.copy();
+        }
+        float span = next.getTick() - prev.getTick();
+        float t = span <= 0.0F ? 0.0F : (tick - prev.getTick()) / span;
+        if (t < 0.0F) {
+            t = 0.0F;
+        } else if (t > 1.0F) {
+            t = 1.0F;
+        }
+        XyzFrameData out = a.copy();
+        out.roamValue = a.roamValue + (b.roamValue - a.roamValue) * (double) t;
+        out.trackRelative = a.trackRelative + (b.trackRelative - a.trackRelative) * (double) t;
+        out.trackAbsolute = a.trackAbsolute + (b.trackAbsolute - a.trackAbsolute) * (double) t;
+        // 模式位取左侧帧（与「本帧状态」口径一致），不做插值
+        return out;
+    }
+
+    /** 过渡段专用的「纯线性」角度值：相邻两帧原始值线性插值，不吃缓动。 */
+    private static double linearValueAt(KeyframeChannel<Double> channel, float tick, double fallback) {
+        if (channel == null || channel.isEmpty()) {
+            return fallback;
+        }
+        Keyframe prev = null;
+        Keyframe next = null;
+        for (Keyframe keyframe : channel.getKeyframes()) {
+            float kt = keyframe.getTick();
+            if (kt <= tick) {
+                if (prev == null || kt >= prev.getTick()) {
+                    prev = keyframe;
+                }
+            } else if (next == null || kt < next.getTick()) {
+                next = keyframe;
+            }
+        }
+        if (prev == null && next == null) {
+            return fallback;
+        }
+        if (prev == null) {
+            return (Double) next.getValue();
+        }
+        double a = (Double) prev.getValue();
+        if (next == null) {
+            return a;
+        }
+        double b = (Double) next.getValue();
+        float span = next.getTick() - prev.getTick();
+        float t = span <= 0.0F ? 0.0F : (tick - prev.getTick()) / span;
+        if (t < 0.0F) {
+            t = 0.0F;
+        } else if (t > 1.0F) {
+            t = 1.0F;
+        }
+        return a + (b - a) * (double) t;
+    }
+
     /** 取某轴当前 tick 的帧级数据（新通道优先；新通道为空时才回退父类老 Double 通道，兼容老存档）。 */
     private static XyzFrameData fdAt(KeyframeChannel<XyzFrameData> data, KeyframeChannel<Double> old, float tick) {
         if (data != null && !data.isEmpty()) {
@@ -394,6 +487,11 @@ public class MultiTrackerClientClip extends KeyframeClip {
         if (fd == null) {
             return baseAxis;
         }
+        return roamWorld(fd, baseAxis, debugAxis);
+    }
+
+    /** 游动端世界坐标（已拿到帧值时的重载，供过渡段线性求值复用）。 */
+    private double roamWorld(XyzFrameData fd, double baseAxis, double debugAxis) {
         return fd.roamMode == 1 ? fd.roamValue : fd.roamValue + debugAxis;
     }
 
@@ -404,6 +502,11 @@ public class MultiTrackerClientClip extends KeyframeClip {
         if (fd == null) {
             return anchorResolved ? anchorAxis : baseAxis;
         }
+        return trackWorld(fd, anchorAxis, anchorResolved, baseAxis);
+    }
+
+    /** 追踪端世界坐标（已拿到帧值时的重载）。 */
+    private double trackWorld(XyzFrameData fd, double anchorAxis, boolean anchorResolved, double baseAxis) {
         if (fd.trackMode == 1) {
             return fd.trackAbsolute;
         }
@@ -417,8 +520,15 @@ public class MultiTrackerClientClip extends KeyframeClip {
         KeyframeChannel<Double> old = axis == 0 ? this.x : axis == 1 ? this.y : this.z;
         boolean inBlend = rb != null && rb.t > 0.0F && rb.t < 1.0F;
         if (inBlend) {
-            double roam = this.roamWorld(data, old, tick, baseAxis, debugAxis);
-            double track = this.trackWorld(data, old, tick, rb.trackPoint[axis], rb.trackResolved, baseAxis);
+            // V1.7.21-Alpha：过渡段两端都按「原始值线性插值」求，避免两侧各自缓动叠成淡入淡出
+            XyzFrameData fd = linearFdAt(data, tick);
+            if (fd == null) {
+                fd = fdAt(data, old, tick);
+            }
+            double roam = fd == null ? baseAxis : this.roamWorld(fd, baseAxis, debugAxis);
+            double track = fd == null
+                ? (rb.trackResolved ? rb.trackPoint[axis] : baseAxis)
+                : this.trackWorld(fd, rb.trackPoint[axis], rb.trackResolved, baseAxis);
             // 过渡方向由起点路线决定：追踪 → 游动 时 from = 追踪端，反之 from = 游动端
             double from = rb.fromIsTrack ? track : roam;
             double to = rb.fromIsTrack ? roam : track;
@@ -436,8 +546,9 @@ public class MultiTrackerClientClip extends KeyframeClip {
         KeyframeChannel<Double> ch = axis == 0 ? this.yaw : axis == 1 ? this.pitch : this.roll;
         boolean inBlend = rb != null && rb.t > 0.0F && rb.t < 1.0F;
         if (inBlend) {
-            float roam = (float) safeValue(ch, tick, (double) baseFallback);
-            float track = (float) safeValue(ch, tick, (double) rb.trackAngle[axis]);
+            // V1.7.21-Alpha：过渡段角度同样按原始值线性插值
+            float roam = (float) linearValueAt(ch, tick, (double) baseFallback);
+            float track = (float) linearValueAt(ch, tick, (double) rb.trackAngle[axis]);
             float from = rb.fromIsTrack ? track : roam;
             float to = rb.fromIsTrack ? roam : track;
             return lerpAngle(from, to, rb.t);
