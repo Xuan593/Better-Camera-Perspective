@@ -35,6 +35,7 @@ import mchorse.bbs_mod.utils.keyframes.KeyframeSegment;
 import mchorse.bbs_mod.utils.keyframes.factories.KeyframeFactories;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
+import net.fabricmc.loader.api.FabricLoader;
 import org.joml.Vector3d;
 import org.joml.Vector3f;
 import perspective.better_camera_perspective.client.clips.AnchorSampler;
@@ -59,6 +60,8 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     // —— 关键帧侧 ——
     public UIButton edit;
     public UIKeyframeEditor keyframes;
+    /** V1.7.22-Alpha：posecurve 共存时的三子窗曲线视图。 */
+    public UIXyzTripleCurvePanel curve;
     public UIToggle additive;
 
     // —— 追踪侧 ——
@@ -94,10 +97,25 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
             );
         this.keyframes.view.duration(() -> this.clip.duration.get());
         this.keyframes.setUndoId("multi_tracker_keyframes");
-        this.edit = new UIButton(UIKeys.GENERAL_EDIT, b -> {
+
+        // V1.7.22-Alpha：三子窗曲线视图（游动-绝对 / 追踪-相对 / 追踪-绝对）
+        this.curve = new UIXyzTripleCurvePanel(this.clip, this.editor, () -> {
             this.editor.embedView(this.keyframes);
             this.keyframes.view.resetView();
             this.keyframes.view.getGraph().clearSelection();
+        });
+
+        this.edit = new UIButton(UIKeys.GENERAL_EDIT, b -> {
+            // posecurve 存在时默认进三子窗曲线视图（其单轴图会让 XyzFrameData 变标量）
+            if (posecurveLoaded()) {
+                this.curve.setClip(this.clip);
+                this.curve.resetView();
+                this.editor.embedView(this.curve);
+            } else {
+                this.editor.embedView(this.keyframes);
+                this.keyframes.view.resetView();
+                this.keyframes.view.getGraph().clearSelection();
+            }
         });
         this.edit.keys().register(Keys.FORMS_EDIT, () -> this.edit.clickItself());
 
@@ -331,6 +349,7 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
         super.fillData();
         this.updateDuration(this.clip.duration.get());
         this.keyframes.setClip(this.clip);
+        this.curve.setClip(this.clip);
 
         // 新建剪辑默认在 tick 0 放一个「空 anchor 关键帧」（未绑定任何模型），
         // 作为游动 / 追踪两条路线的分派锚点。
@@ -587,6 +606,15 @@ public class UIMultiTrackerClip extends UIClip<MultiTrackerClientClip> {
     private float cursorTick() {
         UIContext context = this.getContext();
         return this.editor.getKeyframeCursor(context == null ? 0.0F : context.getTransition()) - (float) this.clip.tick.get().intValue();
+    }
+
+    /** V1.7.22-Alpha：是否装有 BBS-PoseCurve（其标量曲线图与本模组的帧级值不兼容）。 */
+    public static boolean posecurveLoaded() {
+        try {
+            return FabricLoader.getInstance().isModLoaded("bbs-posecurve-addon");
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     /**

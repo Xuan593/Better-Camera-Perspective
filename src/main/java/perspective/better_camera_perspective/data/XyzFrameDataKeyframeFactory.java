@@ -52,6 +52,29 @@ public class XyzFrameDataKeyframeFactory implements IKeyframeFactory<XyzFrameDat
         return value.copy();
     }
 
+    /**
+     * P0 防污染垫片（V1.7.22-Alpha）：BBS 的标量曲线图（含 posecurve）只认
+     * {@code IKeyframeFactory#getY} / {@code yToValue} 这一对标量钩子。
+     * 默认实现里 {@code getY} 恒 0、{@code yToValue} 返回 {@link Double}——
+     * posecurve 的 {@code bbsplus$setValue} 会把 {@code Double} 直接塞回
+     * {@code Keyframe<XyzFrameData>}，后续读取强转 CCE、存档写坏。
+     *
+     * <p>这里覆写为「恒返回完整帧数据」，任何走标量路径的写入最多覆盖数值，
+     * 不会改变值类型；三轴曲线视图本身不经过该路径（自绘面板直接改字段）。</p>
+     *
+     * @return 主值是游动·绝对值（仅用于外部标量图显示）
+     */
+    @Override
+    public double getY(XyzFrameData value) {
+        return value == null ? 0.0D : value.roamValue;
+    }
+
+    /** 标量写入兜底：返回三通道同值的完整帧数据，绝不返回 {@link Double}。 */
+    @Override
+    public Object yToValue(double y) {
+        return new XyzFrameData(y, y, y, 1, 0);
+    }
+
     @Override
     public XyzFrameData interpolate(
         Keyframe<XyzFrameData> prev, Keyframe<XyzFrameData> before, Keyframe<XyzFrameData> after,
